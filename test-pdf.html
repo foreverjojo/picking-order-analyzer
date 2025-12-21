@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF 撿貨單分析工具</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #ef4444;
+            margin-bottom: 20px;
+        }
+
+        .upload-box {
+            background: #334155;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            text-align: center;
+            cursor: pointer;
+            border: 2px dashed #64748b;
+        }
+
+        .upload-box:hover {
+            border-color: #ef4444;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .results {
+            background: #334155;
+            padding: 30px;
+            border-radius: 12px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: #475569;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #ef4444;
+        }
+
+        .stat-label {
+            color: #cbd5e1;
+            margin-top: 5px;
+        }
+
+        .page-section {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .page-section h3 {
+            color: #ef4444;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #475569;
+        }
+
+        .text-content {
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .text-items {
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 6px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .text-item {
+            padding: 8px;
+            margin-bottom: 5px;
+            background: #1e293b;
+            border-radius: 4px;
+            font-size: 0.85em;
+            border-left: 3px solid #64748b;
+        }
+
+        .text-item:hover {
+            background: #334155;
+            border-left-color: #ef4444;
+        }
+
+        .position {
+            color: #94a3b8;
+            font-size: 0.8em;
+        }
+
+        .text-value {
+            color: #10b981;
+            margin-top: 5px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: #475569;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .tab:hover {
+            background: #64748b;
+        }
+
+        .tab.active {
+            background: #ef4444;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .lines-view {
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 6px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .line-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid #1e293b;
+            display: flex;
+            gap: 15px;
+        }
+
+        .line-number {
+            color: #64748b;
+            min-width: 50px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .line-text {
+            flex: 1;
+            color: #cbd5e1;
+        }
+
+        .highlight {
+            background: rgba(239, 68, 68, 0.2);
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>📄 蝦皮 PDF 撿貨單分析工具</h1>
+
+        <div class="upload-box" id="uploadBox">
+            <div style="font-size: 3em; margin-bottom: 10px;">📤</div>
+            <p style="font-size: 1.2em;">點擊或拖放蝦皮 PDF 撿貨單</p>
+            <p style="color: #cbd5e1; margin-top: 10px;">支援 .pdf 格式</p>
+            <input type="file" id="fileInput" accept=".pdf">
+        </div>
+
+        <div class="results" id="results" style="display: none;">
+            <h2>PDF 分析結果</h2>
+
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="pageCount">0</div>
+                    <div class="stat-label">總頁數</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalItems">0</div>
+                    <div class="stat-label">文字項目總數</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalLines">0</div>
+                    <div class="stat-label">總行數</div>
+                </div>
+            </div>
+
+            <div id="pagesContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        const uploadBox = document.getElementById('uploadBox');
+        const fileInput = document.getElementById('fileInput');
+        const results = document.getElementById('results');
+
+        uploadBox.addEventListener('click', () => fileInput.click());
+
+        uploadBox.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadBox.style.borderColor = '#ef4444';
+        });
+
+        uploadBox.addEventListener('dragleave', () => {
+            uploadBox.style.borderColor = '#64748b';
+        });
+
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.style.borderColor = '#64748b';
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        async function handleFile(file) {
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+                console.log('📄 PDF 載入成功，頁數:', pdf.numPages);
+
+                let totalItems = 0;
+                let totalLines = 0;
+                const pagesData = [];
+
+                // 解析每一頁
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+
+                    // 提取文字項目（包含位置和顏色）
+                    const items = textContent.items.map(item => {
+                        // 提取顏色資訊
+                        let color = 'unknown';
+                        let colorRGB = null;
+
+                        if (item.color) {
+                            // 如果有 color 屬性
+                            if (Array.isArray(item.color)) {
+                                colorRGB = item.color;
+                                color = rgbToHex(item.color);
+                            } else {
+                                color = item.color;
+                            }
+                        }
+
+                        // 嘗試從其他屬性獲取顏色
+                        if (item.fontName || item.transform) {
+                            // PDF.js 可能在不同版本中以不同方式存儲顏色
+                        }
+
+                        return {
+                            text: item.str,
+                            x: Math.round(item.transform[4]),
+                            y: Math.round(item.transform[5]),
+                            width: item.width,
+                            height: item.height,
+                            color: color,
+                            colorRGB: colorRGB,
+                            fontName: item.fontName || 'unknown',
+                            fontSize: item.transform ? item.transform[0] : 0
+                        };
+                    });
+
+                    // 組合成純文字（按行分割）
+                    const fullText = textContent.items.map(item => item.str).join(' ');
+                    const lines = fullText.split('\n');
+
+                    totalItems += items.length;
+                    totalLines += lines.length;
+
+                    pagesData.push({
+                        pageNum: i,
+                        items: items,
+                        fullText: fullText,
+                        lines: lines
+                    });
+
+                    console.log(`📄 第 ${i} 頁: ${items.length} 個文字項目`);
+                }
+
+                // 顯示結果
+                displayResults(pdf.numPages, totalItems, totalLines, pagesData);
+
+            } catch (error) {
+                alert('解析失敗：' + error.message);
+                console.error('PDF 解析錯誤:', error);
+            }
+        }
+
+        function displayResults(pageCount, totalItems, totalLines, pagesData) {
+            results.style.display = 'block';
+
+            // 統計資料
+            document.getElementById('pageCount').textContent = pageCount;
+            document.getElementById('totalItems').textContent = totalItems;
+            document.getElementById('totalLines').textContent = totalLines;
+
+            // 顯示每一頁的內容
+            const container = document.getElementById('pagesContainer');
+            container.innerHTML = '';
+
+            pagesData.forEach(pageData => {
+                const pageSection = document.createElement('div');
+                pageSection.className = 'page-section';
+
+                pageSection.innerHTML = `
+                    <h3>📄 第 ${pageData.pageNum} 頁（共 ${pageData.items.length} 個文字項目）</h3>
+                    
+                    <div class="tabs">
+                        <div class="tab active" onclick="switchTab(${pageData.pageNum}, 'text')">📝 完整文字</div>
+                        <div class="tab" onclick="switchTab(${pageData.pageNum}, 'lines')">📋 按行顯示</div>
+                        <div class="tab" onclick="switchTab(${pageData.pageNum}, 'items')">🔍 文字項目（含位置）</div>
+                    </div>
+
+                    <div id="tab-text-${pageData.pageNum}" class="tab-content active">
+                        <div class="text-content">${escapeHtml(pageData.fullText)}</div>
+                    </div>
+
+                    <div id="tab-lines-${pageData.pageNum}" class="tab-content">
+                        <div class="lines-view">
+                            ${pageData.lines.map((line, i) => `
+                                <div class="line-item">
+                                    <span class="line-number">第 ${i + 1} 行</span>
+                                    <span class="line-text">${escapeHtml(line) || '<span style="color: #64748b;">(空行)</span>'}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div id="tab-items-${pageData.pageNum}" class="tab-content">
+                        <div class="text-items">
+                            ${pageData.items.map((item, index) => {
+                    const colorStyle = item.colorRGB ?
+                        `rgb(${Math.round(item.colorRGB[0] * 255)}, ${Math.round(item.colorRGB[1] * 255)}, ${Math.round(item.colorRGB[2] * 255)})` :
+                        '#cbd5e1';
+
+                    return `
+                                <div class="text-item">
+                                    <div class="position">
+                                        項目 #${index + 1} | 位置: (x: ${item.x}, y: ${item.y}) | 大小: ${Math.round(item.width)} × ${Math.round(item.height)}
+                                        ${item.color !== 'unknown' ? ` | 顏色: <span style="color: ${colorStyle};">●</span> ${item.color}` : ''}
+                                        ${item.fontName !== 'unknown' ? ` | 字體: ${item.fontName}` : ''}
+                                        ${item.fontSize ? ` | 字號: ${Math.round(item.fontSize)}` : ''}
+                                    </div>
+                                    <div class="text-value" style="color: ${colorStyle};">"${escapeHtml(item.text)}"</div>
+                                </div>
+                            `}).join('')}
+                        </div>
+                    </div>
+                `;
+
+                container.appendChild(pageSection);
+            });
+        }
+
+        function switchTab(pageNum, tabName) {
+            // 移除所有 active
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            // 啟用選中的 tab
+            event.target.classList.add('active');
+            document.getElementById(`tab-${tabName}-${pageNum}`).classList.add('active');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function rgbToHex(rgb) {
+            if (!Array.isArray(rgb) || rgb.length < 3) return 'unknown';
+            const r = Math.round(rgb[0] * 255).toString(16).padStart(2, '0');
+            const g = Math.round(rgb[1] * 255).toString(16).padStart(2, '0');
+            const b = Math.round(rgb[2] * 255).toString(16).padStart(2, '0');
+            return `#${r}${g}${b}`;
+        }
+    </script>
+</body>
+
+</html>

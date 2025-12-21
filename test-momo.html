@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MOMO 撿貨單測試</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #f59e0b;
+            margin-bottom: 20px;
+        }
+
+        .upload-box {
+            background: #334155;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            text-align: center;
+            cursor: pointer;
+            border: 2px dashed #64748b;
+        }
+
+        .upload-box:hover {
+            border-color: #f59e0b;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .results {
+            background: #334155;
+            padding: 30px;
+            border-radius: 12px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #475569;
+        }
+
+        th {
+            background: #475569;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #2d3748;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: #475569;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #10b981;
+        }
+
+        .stat-label {
+            color: #cbd5e1;
+            margin-top: 5px;
+        }
+
+        .success {
+            color: #10b981;
+        }
+
+        .warning {
+            color: #f59e0b;
+        }
+
+        pre {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>📊 MOMO 撿貨單解析測試</h1>
+
+        <div class="upload-box" id="uploadBox">
+            <div style="font-size: 3em; margin-bottom: 10px;">📤</div>
+            <p style="font-size: 1.2em;">點擊或拖放 MOMO 撿貨單檔案</p>
+            <p style="color: #cbd5e1; margin-top: 10px;">支援 .xlsx 格式</p>
+            <input type="file" id="fileInput" accept=".xlsx,.xls">
+        </div>
+
+        <div class="results" id="results" style="display: none;">
+            <h2>解析結果</h2>
+
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalRows">0</div>
+                    <div class="stat-label">總行數</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="validProducts">0</div>
+                    <div class="stat-label">有效商品數</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="filteredRows">0</div>
+                    <div class="stat-label">過濾掉的行數</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalQuantity">0</div>
+                    <div class="stat-label">總數量</div>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 30px;">提取的商品資料</h3>
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>商品名稱</th>
+                        <th>單品規格</th>
+                        <th>撿貨數量</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table>
+
+            <h3 style="margin-top: 30px;">過濾掉的資料</h3>
+            <div id="filteredData"></div>
+
+            <h3 style="margin-top: 30px;">原始 JSON 資料（前5筆）</h3>
+            <pre id="rawData"></pre>
+        </div>
+    </div>
+
+    <script>
+        const uploadBox = document.getElementById('uploadBox');
+        const fileInput = document.getElementById('fileInput');
+        const results = document.getElementById('results');
+
+        uploadBox.addEventListener('click', () => fileInput.click());
+
+        uploadBox.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadBox.style.borderColor = '#f59e0b';
+        });
+
+        uploadBox.addEventListener('dragleave', () => {
+            uploadBox.style.borderColor = '#64748b';
+        });
+
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.style.borderColor = '#64748b';
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            const reader = new FileReader();
+
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+                    console.log('原始資料:', jsonData);
+
+                    // 解析資料
+                    const parsed = parseMomoData(jsonData);
+
+                    // 顯示結果
+                    displayResults(parsed, jsonData);
+
+                } catch (error) {
+                    alert('解析失敗：' + error.message);
+                    console.error(error);
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        function parseMomoData(jsonData) {
+            const validProducts = [];
+            const filteredRows = [];
+
+            jsonData.forEach((row, index) => {
+                const productName = row['商品名稱'] || '';
+                const productSpec = row['單品規格'] || '';
+                const quantity = parseInt(row['撿貨數量'] || 0);
+
+                // 檢查是否需要過濾
+                const shouldFilter =
+                    productName.includes('運費') ||
+                    !productName ||
+                    quantity <= 0;
+
+                if (shouldFilter) {
+                    filteredRows.push({
+                        index: index + 1,
+                        productName: productName,
+                        reason: !productName ? '空白商品名稱' :
+                            productName.includes('運費') ? '運費行' :
+                                '數量為0或負數'
+                    });
+                } else {
+                    validProducts.push({
+                        index: index + 1,
+                        name: productName,
+                        spec: productSpec,
+                        quantity: quantity
+                    });
+                }
+            });
+
+            return {
+                validProducts,
+                filteredRows,
+                totalRows: jsonData.length
+            };
+        }
+
+        function displayResults(parsed, rawData) {
+            results.style.display = 'block';
+
+            // 統計資料
+            document.getElementById('totalRows').textContent = parsed.totalRows;
+            document.getElementById('validProducts').textContent = parsed.validProducts.length;
+            document.getElementById('filteredRows').textContent = parsed.filteredRows.length;
+
+            const totalQty = parsed.validProducts.reduce((sum, p) => sum + p.quantity, 0);
+            document.getElementById('totalQuantity').textContent = totalQty;
+
+            // 商品表格
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            parsed.validProducts.forEach(product => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${product.index}</td>
+                    <td>${product.name}</td>
+                    <td>${product.spec}</td>
+                    <td><strong>${product.quantity}</strong></td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            // 過濾掉的資料
+            const filteredDiv = document.getElementById('filteredData');
+            if (parsed.filteredRows.length > 0) {
+                filteredDiv.innerHTML = '<ul>' +
+                    parsed.filteredRows.map(f =>
+                        `<li>第 ${f.index} 行: <span class="warning">${f.productName || '(空白)'}</span> - ${f.reason}</li>`
+                    ).join('') +
+                    '</ul>';
+            } else {
+                filteredDiv.innerHTML = '<p class="success">✓ 沒有需要過濾的資料</p>';
+            }
+
+            // 原始資料
+            document.getElementById('rawData').textContent =
+                JSON.stringify(rawData.slice(0, 5), null, 2);
+        }
+    </script>
+</body>
+
+</html>

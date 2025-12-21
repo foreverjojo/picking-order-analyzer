@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>檔案分析工具</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #6366f1;
+        }
+
+        .upload-section {
+            background: #334155;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+        }
+
+        .file-input {
+            display: block;
+            margin: 20px 0;
+            padding: 10px;
+            background: #475569;
+            border: 2px solid #64748b;
+            border-radius: 6px;
+            color: #f1f5f9;
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .analysis-result {
+            background: #334155;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            color: #8b5cf6;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #475569;
+            padding-bottom: 10px;
+        }
+
+        pre {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            background: #1e293b;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #475569;
+        }
+
+        th {
+            background: #475569;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #2d3748;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .stat-card {
+            background: #475569;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #10b981;
+        }
+
+        .stat-label {
+            color: #cbd5e1;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>📊 撿貨單檔案分析工具</h1>
+
+        <div class="upload-section">
+            <h2>上傳檔案進行分析</h2>
+            <input type="file" id="fileInput" class="file-input" accept=".xlsx,.xls">
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        document.getElementById('fileInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="analysis-result"><h2>🔄 分析中...</h2></div>';
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+
+                let html = '';
+
+                // 工作表資訊
+                html += '<div class="analysis-result">';
+                html += '<h2>📑 工作表資訊</h2>';
+                html += '<div class="stats">';
+                html += `<div class="stat-card"><div class="stat-value">${workbook.SheetNames.length}</div><div class="stat-label">工作表數量</div></div>`;
+                html += `<div class="stat-card"><div class="stat-value">${workbook.SheetNames.join(', ')}</div><div class="stat-label">工作表名稱</div></div>`;
+                html += '</div></div>';
+
+                // 分析每個工作表
+                workbook.SheetNames.forEach((sheetName, index) => {
+                    const worksheet = workbook.Sheets[sheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                    html += '<div class="analysis-result">';
+                    html += `<h2>📄 工作表 ${index + 1}: ${sheetName}</h2>`;
+
+                    // 統計資訊
+                    html += '<div class="stats">';
+                    html += `<div class="stat-card"><div class="stat-value">${jsonData.length}</div><div class="stat-label">總行數</div></div>`;
+                    if (jsonData.length > 0) {
+                        html += `<div class="stat-card"><div class="stat-value">${jsonData[0].length}</div><div class="stat-label">欄位數</div></div>`;
+                    }
+                    html += '</div>';
+
+                    // 顯示標題列（第一行）
+                    if (jsonData.length > 0) {
+                        html += '<h3>📋 標題列（第1行）</h3>';
+                        html += '<pre>' + JSON.stringify(jsonData[0], null, 2) + '</pre>';
+                    }
+
+                    // 顯示前10行資料
+                    html += '<h3>📊 前10行資料</h3>';
+                    html += '<table>';
+
+                    // 表頭
+                    if (jsonData.length > 0) {
+                        html += '<tr>';
+                        jsonData[0].forEach(header => {
+                            html += `<th>${header || '(空)'}</th>`;
+                        });
+                        html += '</tr>';
+                    }
+
+                    // 數據行
+                    for (let i = 1; i < Math.min(11, jsonData.length); i++) {
+                        html += '<tr>';
+                        jsonData[i].forEach(cell => {
+                            html += `<td>${cell !== undefined && cell !== null ? cell : '(空)'}</td>`;
+                        });
+                        html += '</tr>';
+                    }
+
+                    html += '</table>';
+
+                    // 顯示 JSON 格式的前5筆資料
+                    const jsonWithHeaders = XLSX.utils.sheet_to_json(worksheet);
+                    html += '<h3>💾 JSON 格式（前5筆）</h3>';
+                    html += '<pre>' + JSON.stringify(jsonWithHeaders.slice(0, 5), null, 2) + '</pre>';
+
+                    // 欄位分析
+                    if (jsonWithHeaders.length > 0) {
+                        html += '<h3>🔍 欄位分析</h3>';
+                        const fields = Object.keys(jsonWithHeaders[0]);
+                        html += '<ul style="background: #1e293b; padding: 20px; border-radius: 6px; list-style-position: inside;">';
+                        fields.forEach(field => {
+                            // 統計非空值數量
+                            const nonEmptyCount = jsonWithHeaders.filter(row => row[field] !== undefined && row[field] !== null && row[field] !== '').length;
+                            const percentage = ((nonEmptyCount / jsonWithHeaders.length) * 100).toFixed(1);
+                            html += `<li style="margin: 8px 0;"><strong>${field}</strong>: ${nonEmptyCount}/${jsonWithHeaders.length} 筆有資料 (${percentage}%)</li>`;
+                        });
+                        html += '</ul>';
+                    }
+
+                    html += '</div>';
+                });
+
+                resultsDiv.innerHTML = html;
+
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="analysis-result">
+                        <h2>❌ 錯誤</h2>
+                        <pre>${error.message}</pre>
+                    </div>
+                `;
+            }
+        });
+    </script>
+</body>
+
+</html>

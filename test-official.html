@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>官網撿貨單測試</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #10b981;
+            margin-bottom: 20px;
+        }
+
+        .upload-box {
+            background: #334155;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            text-align: center;
+            cursor: pointer;
+            border: 2px dashed #64748b;
+        }
+
+        .upload-box:hover {
+            border-color: #10b981;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .results {
+            background: #334155;
+            padding: 30px;
+            border-radius: 12px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #475569;
+        }
+
+        th {
+            background: #475569;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #2d3748;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: #475569;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #10b981;
+        }
+
+        .stat-label {
+            color: #cbd5e1;
+            margin-top: 5px;
+        }
+
+        .success {
+            color: #10b981;
+        }
+
+        .info {
+            color: #3b82f6;
+        }
+
+        pre {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin-top: 15px;
+        }
+
+        .metadata {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+
+        .metadata h4 {
+            color: #3b82f6;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🌐 官網撿貨單解析測試</h1>
+
+        <div class="upload-box" id="uploadBox">
+            <div style="font-size: 3em; margin-bottom: 10px;">📤</div>
+            <p style="font-size: 1.2em;">點擊或拖放官網撿貨單檔案</p>
+            <p style="color: #cbd5e1; margin-top: 10px;">支援 .xlsx 格式</p>
+            <input type="file" id="fileInput" accept=".xlsx,.xls">
+        </div>
+
+        <div class="results" id="results" style="display: none;">
+            <h2>解析結果</h2>
+
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalRows">0</div>
+                    <div class="stat-label">檔案總行數</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="skippedRows">6</div>
+                    <div class="stat-label">跳過的元數據行數</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="validProducts">0</div>
+                    <div class="stat-label">有效商品數</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalQuantity">0</div>
+                    <div class="stat-label">總數量</div>
+                </div>
+            </div>
+
+            <div class="metadata" id="metadataSection">
+                <h4>📋 前6行元數據（已跳過）+ 第7行標題</h4>
+                <div id="metadataContent"></div>
+            </div>
+
+            <h3 style="margin-top: 30px;">提取的商品資料（從第8行開始）</h3>
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th>原始行號</th>
+                        <th>商品名稱</th>
+                        <th>規格</th>
+                        <th>數量</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table>
+
+            <h3 style="margin-top: 30px;">原始 JSON 資料（前5筆，從第8行開始）</h3>
+            <pre id="rawData"></pre>
+        </div>
+    </div>
+
+    <script>
+        const uploadBox = document.getElementById('uploadBox');
+        const fileInput = document.getElementById('fileInput');
+        const results = document.getElementById('results');
+
+        uploadBox.addEventListener('click', () => fileInput.click());
+
+        uploadBox.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadBox.style.borderColor = '#10b981';
+        });
+
+        uploadBox.addEventListener('dragleave', () => {
+            uploadBox.style.borderColor = '#64748b';
+        });
+
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.style.borderColor = '#64748b';
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            const reader = new FileReader();
+
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+
+                    // 讀取所有資料（包含前6行元數據）
+                    const allData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                    // 跳過前6行元數據，第7行是標題，第8行開始是資料
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+                        range: 6  // 跳過前6行元數據，第7行會被當作標題
+                    });
+
+                    console.log('📊 檔案總行數:', allData.length);
+                    console.log('📋 前6行元數據:', allData.slice(0, 6));
+                    console.log('📌 第7行（標題行）:', allData[6]);
+                    console.log('📌 第8行（第一筆商品）:', allData[7]);
+                    console.log('📦 從第7行開始的JSON資料:', jsonData);
+                    console.log('🔍 第一筆商品資料的欄位:', jsonData[0] ? Object.keys(jsonData[0]) : '無資料');
+
+                    // 解析資料
+                    const parsed = parseOfficialData(jsonData, allData);
+
+                    // 顯示結果
+                    displayResults(parsed, jsonData, allData);
+
+                } catch (error) {
+                    alert('解析失敗：' + error.message);
+                    console.error(error);
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        function parseOfficialData(jsonData, allData) {
+            const validProducts = [];
+
+            jsonData.forEach((row, index) => {
+                const productName = (row['商品名稱'] || '').trim();
+                const productSpec = (row['規格'] || '').trim();
+                const quantity = parseInt(row['數量'] || 0);
+
+                // 只要有商品名稱和數量就提取
+                if (productName && quantity > 0) {
+                    validProducts.push({
+                        originalRow: index + 8,  // 原始行號（前6行元數據 + 第7行標題 + index）
+                        name: productName,
+                        spec: productSpec,
+                        quantity: quantity
+                    });
+                }
+            });
+
+            return {
+                validProducts,
+                totalRows: allData.length,
+                skippedRows: 6  // 只跳過前6行元數據
+            };
+        }
+
+        function displayResults(parsed, jsonData, allData) {
+            results.style.display = 'block';
+
+            // 統計資料
+            document.getElementById('totalRows').textContent = parsed.totalRows;
+            document.getElementById('skippedRows').textContent = parsed.skippedRows;
+            document.getElementById('validProducts').textContent = parsed.validProducts.length;
+
+            const totalQty = parsed.validProducts.reduce((sum, p) => sum + p.quantity, 0);
+            document.getElementById('totalQuantity').textContent = totalQty;
+
+            // 顯示前6行元數據 + 第7行標題
+            const metadataDiv = document.getElementById('metadataContent');
+            let metadataHTML = '<ul>';
+            allData.slice(0, 6).forEach((row, i) => {
+                metadataHTML += `<li style="color: #cbd5e1;">第 ${i + 1} 行: ${JSON.stringify(row)}</li>`;
+            });
+            metadataHTML += `<li style="color: #3b82f6;"><strong>第 7 行（標題）: ${JSON.stringify(allData[6])}</strong></li>`;
+            metadataHTML += '</ul>';
+
+            // 顯示偵測到的欄位
+            if (jsonData.length > 0) {
+                const fields = Object.keys(jsonData[0]);
+                metadataHTML += `<div style="margin-top: 15px; padding: 10px; background: #475569; border-radius: 6px;">
+                    <strong style="color: #10b981;">✓ 偵測到的欄位：</strong><br>
+                    ${fields.map(f => `<span style="color: #cbd5e1;">"${f}"</span>`).join(', ')}
+                </div>`;
+            } else {
+                metadataHTML += `<div style="margin-top: 15px; padding: 10px; background: #ef4444; border-radius: 6px;">
+                    <strong>⚠️ 警告：從第8行開始沒有讀取到任何資料！</strong>
+                </div>`;
+            }
+
+            metadataDiv.innerHTML = metadataHTML;
+
+            // 商品表格
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            if (parsed.validProducts.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #f59e0b;">⚠️ 沒有提取到任何商品資料，請檢查Console查看詳細資訊</td></tr>';
+            } else {
+                parsed.validProducts.forEach(product => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>第 ${product.originalRow} 行</td>
+                        <td>${product.name}</td>
+                        <td>${product.spec}</td>
+                        <td><strong>${product.quantity}</strong></td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+
+            // 原始資料（從第8行開始的前5筆）
+            document.getElementById('rawData').textContent =
+                JSON.stringify(jsonData.slice(0, 5), null, 2);
+        }
+    </script>
+</body>
+
+</html>
+```

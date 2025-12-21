@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>橘點子撿貨單分析 - 自動映射測試</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #FF6B00;
+        }
+
+        .upload-box {
+            border: 2px dashed #FF6B00;
+            padding: 40px;
+            text-align: center;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+
+        .upload-box:hover {
+            background: #fff5ee;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            font-size: 12px;
+        }
+
+        th {
+            background: #FF6B00;
+            color: white;
+            position: sticky;
+            top: 0;
+        }
+
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        .stats {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .success {
+            color: #28a745;
+        }
+
+        .warning {
+            color: #ffc107;
+        }
+
+        .error {
+            color: #dc3545;
+        }
+
+        .filtered {
+            color: #6c757d;
+            font-style: italic;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🍊 橘點子撿貨單 - 自動映射測試</h1>
+
+        <div class="upload-box" onclick="document.getElementById('fileInput').click()">
+            <p>📁 拖曳或點擊上傳橘點子撿貨單 Excel 檔案</p>
+            <input type="file" id="fileInput" accept=".xls,.xlsx" style="display:none;">
+        </div>
+
+        <div id="stats" class="stats" style="display:none;"></div>
+
+        <div id="result" style="display:none;">
+            <h3>📦 解析結果</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>原始資料</th>
+                        <th>商品名稱</th>
+                        <th>數量</th>
+                        <th>報表商品</th>
+                        <th>欄位</th>
+                        <th>規格</th>
+                        <th>對應數量</th>
+                        <th>信心度</th>
+                    </tr>
+                </thead>
+                <tbody id="dataBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // 標準報表商品名稱列表
+        const standardProductNames = [
+            '豆塔-蔓越莓', '豆塔-焦糖', '豆塔-巧克力', '豆塔-抹茶', '豆塔-椒麻',
+            '堅果塔-蜂蜜', '堅果塔-焦糖', '堅果塔-巧克力', '堅果塔-海苔', '堅果塔-咖哩',
+            '豆塔-綜合', '堅果塔-綜合', '雙塔',
+            '土鳳梨酥(紅點)', '鳳凰酥',
+            '雪花餅-綜合', '雪花餅-蔓越莓', '雪花餅-巧克力', '雪花餅-金沙', '雪花餅-抹茶', '雪花餅-肉鬆',
+            '瑪德蓮-綜合', '瑪德蓮-蜂蜜', '瑪德蓮-巧克力', '瑪德蓮-紅茶', '瑪德蓮-抹茶', '瑪德蓮-柑橘', '瑪德蓮-檸檬',
+            '無調味綜合堅果', '無調味夏威夷豆', '無調味腰果', '無調味杏仁', '無調味核桃',
+            '★中東椰棗300g', '椰棗豆子150g', '椰棗腰果150g', '椰棗杏仁150g', '椰棗核桃150g',
+            '牛奶糖', '南棗核桃糕', '牛奶糖-50g',
+            '瓦片-綜合', '瓦片-原味', '瓦片-紅茶', '瓦片-巧克力', '瓦片-海苔', '瓦片-抹茶', '瓦片-黑糖', '瓦片-青花椒', '瓦片-原味45克',
+            '奶油-焦糖牛奶', '奶油-法國巧克力', '奶油-蜂蜜檸檬', '奶油-伯爵紅茶', '奶油-抹茶',
+            '千層小酥條-原味', '西點-綜合', '西點-巧克力貝殼', '西點-咖啡小花', '西點-藍莓小花', '西點-蔓越莓貝殼', '西點-乳酪酥條',
+            '雙塔禮盒', '蔓越莓禮盒', '綜豆禮盒', '綜堅禮盒', '晴空塔餅禮盒', '暖暖幸福禮盒', '臻愛時光禮盒', '濃情滿載禮盒',
+            '浪漫詩篇禮盒', '戀戀雪花禮盒', '午後漫步禮盒', '那年花開禮盒', '花間逸韻禮盒',
+            '輕-香榭漫遊禮盒', '輕-晨曦物語禮盒', '輕-金緻典藏禮盒', '輕-月光序曲禮盒'
+        ];
+
+        // 解析橘點子格式：返回商品數組
+        function parseOrangePointCell(cellValue) {
+            if (!cellValue || typeof cellValue !== 'string') return [];
+
+            const text = cellValue.trim();
+            if (!text) return [];
+
+            const results = [];
+
+            // 過濾咖啡（除了咖啡小花）
+            if (text.includes('咖啡') && !text.includes('咖啡小花')) {
+                return [];
+            }
+
+            // 處理贈品格式：贈品:滿額贈#艾薇-杏仁瓦片(原味)135g 1 或 x 1 或 x1
+            if (text.startsWith('贈品:')) {
+                // 提取 # 後面的商品名稱和最後的數量（支援 x 1, x1, 或直接數字）
+                const giftMatch = text.match(/[#](.+?)\s*[x×]?\s*(\d+)$/i);
+                if (giftMatch) {
+                    const quantity = parseInt(giftMatch[2]);
+                    // 過濾數量為 0 的項目
+                    if (quantity === 0) return [];
+
+                    results.push({
+                        name: giftMatch[1].trim(),
+                        quantity: quantity,
+                        type: '贈品'
+                    });
+                }
+                return results;
+            }
+
+            // 處理試吃格式：試吃:艾薇-杏仁瓦片(原味)135g*1+艾薇-杏仁瓦片(巧克力)90g*1 79
+            if (text.startsWith('試吃:')) {
+                // 提取最後的總數量
+                const quantityMatch = text.match(/\s+(\d+)$/);
+                if (!quantityMatch) return [];
+                const totalQuantity = parseInt(quantityMatch[1]);
+
+                // 過濾數量為 0 的項目
+                if (totalQuantity === 0) return [];
+
+                // 提取商品列表部分（移除 "試吃:" 和最後的數量）
+                const productPart = text.replace(/^試吃:/, '').replace(/\s+\d+$/, '').trim();
+
+                // 分割商品（以 + 分隔）
+                const productItems = productPart.split('+');
+                for (const item of productItems) {
+                    // 移除 *N 部分，只保留商品名稱
+                    const cleanName = item.replace(/\*\d+$/, '').trim();
+                    if (cleanName) {
+                        results.push({
+                            name: cleanName,
+                            quantity: totalQuantity,
+                            type: '試吃'
+                        });
+                    }
+                }
+                return results;
+            }
+
+            // 普通格式：商品名稱 數量
+            const match = text.match(/^(.+?)\s+(\d+)$/);
+            if (match) {
+                const name = match[1].trim();
+                const quantity = parseInt(match[2]);
+
+                // 過濾 Total 行和數量為 0 的項目
+                if (name.toLowerCase() === 'total' || quantity === 0) {
+                    return [];
+                }
+
+                results.push({
+                    name: name,
+                    quantity: quantity
+                });
+            }
+
+            return results;
+        }
+
+        // 標準化商品名稱
+        function normalizeProductName(name) {
+            if (!name) return null;
+            const cleaned = name.replace(/\s+/g, '');
+
+            // 精確匹配
+            for (let stdName of standardProductNames) {
+                if (cleaned === stdName.replace(/\s+/g, '')) return stdName;
+            }
+
+            // 最長匹配
+            let bestMatch = null;
+            let bestMatchLength = 0;
+            for (let stdName of standardProductNames) {
+                const stdCleaned = stdName.replace(/\s+/g, '');
+                if (cleaned.includes(stdCleaned) && stdCleaned.length > bestMatchLength) {
+                    bestMatch = stdName;
+                    bestMatchLength = stdCleaned.length;
+                }
+            }
+
+            return bestMatch || name;
+        }
+
+        // 橘點子專用映射函數
+        function autoMapProductOrangePoint(productName, quantity) {
+            const nameNoSpace = productName.replace(/\s+/g, '');
+
+            let mappedName = null;
+            let column = null;
+            let spec = null;
+            let confidence = 0.3;
+
+            // === 瓦片 ===
+            if (/杏仁瓦片/.test(nameNoSpace)) {
+                // 提取口味 [原味] 或 (原味) 格式
+                const flavorMatch = productName.match(/[\[\(](.+?)[\]\)]/) || productName.match(/瓦片[-]?(.+?)(?:\d+g|$)/);
+                let flavor = '';
+                if (flavorMatch) {
+                    flavor = flavorMatch[1].trim();
+                }
+                if (flavor === '原味' || /原味/.test(nameNoSpace)) mappedName = '瓦片-原味';
+                else if (flavor === '巧克力' || /巧克力/.test(nameNoSpace)) mappedName = '瓦片-巧克力';
+                else if (flavor === '紅茶' || /紅茶/.test(nameNoSpace)) mappedName = '瓦片-紅茶';
+                else if (flavor === '黑糖' || /黑糖/.test(nameNoSpace)) mappedName = '瓦片-黑糖';
+                else if (flavor === '抹茶' || /抹茶/.test(nameNoSpace)) mappedName = '瓦片-抹茶';
+                else if (flavor === '海苔' || /海苔/.test(nameNoSpace)) mappedName = '瓦片-海苔';
+                else if (flavor === '青花椒' || /青花椒/.test(nameNoSpace)) mappedName = '瓦片-青花椒';
+                else if (/綜合/.test(flavor) || /綜合/.test(nameNoSpace)) mappedName = '瓦片-綜合';
+                confidence = 0.95;
+
+                // 規格
+                if (/135g/.test(nameNoSpace)) { column = 'C'; spec = '135g'; }
+                else if (/90g/.test(nameNoSpace)) { column = 'B'; spec = '90g'; }
+                else if (/45g/.test(nameNoSpace)) { column = 'B'; spec = '45g'; }
+            }
+
+            // === 夏威夷豆塔 ===
+            if (!mappedName && /夏威夷豆塔/.test(nameNoSpace)) {
+                const flavorMatch = productName.match(/\[(.+?)\]/);
+                if (flavorMatch) {
+                    const flavor = flavorMatch[1];
+                    if (flavor.includes('蔓越莓')) mappedName = '豆塔-蔓越莓';
+                    else if (flavor.includes('焦糖')) mappedName = '豆塔-焦糖';
+                    else if (flavor.includes('巧克力')) mappedName = '豆塔-巧克力';
+                    else if (flavor.includes('抹茶')) mappedName = '豆塔-抹茶';
+                    else if (flavor.includes('椒麻')) mappedName = '豆塔-椒麻';
+                    else if (flavor.includes('綜合')) mappedName = '豆塔-綜合';
+                }
+                confidence = 0.95;
+
+                if (/10入/.test(nameNoSpace)) { column = 'B'; spec = '10入袋裝'; }
+                else if (/15入/.test(nameNoSpace)) { column = 'C'; spec = '15入袋裝'; }
+            }
+
+            // === 堅果塔 ===
+            if (!mappedName && /堅果塔|綜合堅果塔/.test(nameNoSpace)) {
+                const flavorMatch = productName.match(/\[(.+?)\]/);
+                if (flavorMatch) {
+                    const flavor = flavorMatch[1];
+                    if (flavor.includes('蜂蜜')) mappedName = '堅果塔-蜂蜜';
+                    else if (flavor.includes('焦糖')) mappedName = '堅果塔-焦糖';
+                    else if (flavor.includes('巧克力')) mappedName = '堅果塔-巧克力';
+                    else if (flavor.includes('海苔')) mappedName = '堅果塔-海苔';
+                    else if (flavor.includes('咖哩')) mappedName = '堅果塔-咖哩';
+                    else if (flavor.includes('綜合')) mappedName = '堅果塔-綜合';
+                }
+                confidence = 0.95;
+
+                if (/10入/.test(nameNoSpace)) { column = 'B'; spec = '10入袋裝'; }
+                else if (/15入/.test(nameNoSpace)) { column = 'C'; spec = '15入袋裝'; }
+            }
+
+            // === 雪花餅 ===
+            if (!mappedName && /雪花餅/.test(nameNoSpace)) {
+                const flavorMatch = productName.match(/\[(.+?)\]/);
+                if (flavorMatch) {
+                    const flavor = flavorMatch[1];
+                    if (flavor.includes('蔓越莓')) mappedName = '雪花餅-蔓越莓';
+                    else if (flavor.includes('巧克力')) mappedName = '雪花餅-巧克力';
+                    else if (flavor.includes('金沙')) mappedName = '雪花餅-金沙';
+                    else if (flavor.includes('抹茶')) mappedName = '雪花餅-抹茶';
+                    else if (flavor.includes('肉鬆')) mappedName = '雪花餅-肉鬆';
+                    else if (flavor.includes('綜合')) mappedName = '雪花餅-綜合';
+                }
+                confidence = 0.95;
+
+                if (/10入/.test(nameNoSpace)) { column = 'B'; spec = '10入袋裝'; }
+                else if (/15入/.test(nameNoSpace)) { column = 'C'; spec = '15入袋裝'; }
+            }
+
+            // === 瑪德蓮 ===
+            if (!mappedName && /瑪德蓮/.test(nameNoSpace)) {
+                const flavorMatch = productName.match(/\[(.+?)\]/);
+                if (flavorMatch) {
+                    const flavor = flavorMatch[1];
+                    if (flavor.includes('蜂蜜')) mappedName = '瑪德蓮-蜂蜜';
+                    else if (flavor.includes('巧克力')) mappedName = '瑪德蓮-巧克力';
+                    else if (flavor.includes('紅茶')) mappedName = '瑪德蓮-紅茶';
+                    else if (flavor.includes('抹茶')) mappedName = '瑪德蓮-抹茶';
+                    else if (flavor.includes('柑橘')) mappedName = '瑪德蓮-柑橘';
+                    else if (flavor.includes('檸檬')) mappedName = '瑪德蓮-檸檬';
+                    else if (flavor.includes('綜合')) mappedName = '瑪德蓮-綜合';
+                }
+                confidence = 0.95;
+            }
+
+            // === 禮盒 ===
+            if (!mappedName && /禮盒/.test(nameNoSpace)) {
+                column = 'B'; spec = '禮盒'; confidence = 0.95;
+                if (/雙塔禮盒|招牌雙塔/.test(nameNoSpace)) mappedName = '雙塔禮盒';
+                else if (/戀戀雪花/.test(nameNoSpace)) mappedName = '戀戀雪花禮盒';
+                else if (/浪漫詩篇/.test(nameNoSpace)) mappedName = '浪漫詩篇禮盒';
+                else if (/暖暖幸福/.test(nameNoSpace)) mappedName = '暖暖幸福禮盒';
+                else if (/臻愛時光/.test(nameNoSpace)) mappedName = '臻愛時光禮盒';
+            }
+
+            // 標準化名稱
+            const standardizedName = mappedName ? normalizeProductName(mappedName) : null;
+            const mappedQuantity = column ? quantity : 0;
+
+            return {
+                templateProduct: standardizedName,
+                templateColumn: column,
+                templateSpec: spec,
+                multiplier: 1,
+                mappedQuantity: mappedQuantity,
+                confidence: mappedName ? confidence : 0.3
+            };
+        }
+
+        document.getElementById('fileInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const arrayBuffer = await file.arrayBuffer();
+            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            const data = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+            // 解析所有欄位
+            const products = [];
+            const seenProducts = new Set(); // 用於去重
+
+            for (let row of data) {
+                for (let cell of row) {
+                    if (cell === '品名') continue; // 跳過標題
+                    const parsedItems = parseOrangePointCell(String(cell));
+                    // parseOrangePointCell 現在返回數組
+                    for (const parsed of parsedItems) {
+                        // 創建唯一鍵以去重（商品名稱 + 數量）
+                        const key = `${parsed.name}|${parsed.quantity}`;
+                        if (!seenProducts.has(key)) {
+                            seenProducts.add(key);
+                            products.push({
+                                raw: cell,
+                                ...parsed
+                            });
+                        }
+                    }
+                }
+            }
+
+            // 執行映射
+            const results = products.map(p => ({
+                ...p,
+                ...autoMapProductOrangePoint(p.name, p.quantity)
+            }));
+
+            // 統計
+            const total = results.length;
+            const mapped = results.filter(r => r.templateProduct).length;
+            const filtered = products.length - results.length;
+
+            document.getElementById('stats').style.display = 'block';
+            document.getElementById('stats').innerHTML = `
+                <strong>📊 統計：</strong>
+                總計 ${total} 項 | 
+                <span class="success">成功映射 ${mapped} 項</span> | 
+                <span class="warning">未識別 ${total - mapped} 項</span>
+            `;
+
+            // 顯示結果
+            document.getElementById('result').style.display = 'block';
+            const tbody = document.getElementById('dataBody');
+            tbody.innerHTML = '';
+
+            results.forEach((r, i) => {
+                const tr = document.createElement('tr');
+                const confidence = Math.round((r.confidence || 0) * 100);
+                const confidenceClass = confidence >= 90 ? 'success' : confidence >= 70 ? 'warning' : 'error';
+
+                tr.innerHTML = `
+                    <td>${i + 1}</td>
+                    <td>${r.raw || ''}</td>
+                    <td>${r.name || ''}</td>
+                    <td>${r.quantity || ''}</td>
+                    <td>${r.templateProduct || '<span class="error">❌ 未識別</span>'}</td>
+                    <td>${r.templateColumn || '-'}</td>
+                    <td>${r.templateSpec || '-'}</td>
+                    <td>${r.mappedQuantity || '-'}</td>
+                    <td class="${confidenceClass}">${confidence}%</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        });
+    </script>
+</body>
+
+</html>

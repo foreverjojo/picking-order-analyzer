@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>手動對應工具</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #f59e0b;
+            margin-bottom: 20px;
+        }
+
+        .upload-section {
+            background: #334155;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .upload-box {
+            display: inline-block;
+            background: #475569;
+            padding: 20px 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 2px dashed #64748b;
+            margin: 10px;
+        }
+
+        .upload-box:hover {
+            border-color: #f59e0b;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .mapping-area {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: #334155;
+            padding: 20px;
+            border-radius: 12px;
+        }
+
+        .panel h2 {
+            color: #f59e0b;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .product-list {
+            max-height: 700px;
+            overflow-y: auto;
+        }
+
+        .picking-item {
+            background: #475569;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+
+        .picking-item:hover {
+            background: #5a6a7d;
+        }
+
+        .picking-item.selected {
+            border-color: #f59e0b;
+            background: #5a6a7d;
+        }
+
+        .template-item {
+            background: #475569;
+            padding: 12px;
+            margin-bottom: 12px;
+            border-radius: 6px;
+        }
+
+        .template-product-name {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #10b981;
+        }
+
+        .spec-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .spec-btn {
+            padding: 6px 12px;
+            background: #334155;
+            border: 1px solid #64748b;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+
+        .spec-btn:hover {
+            background: #475569;
+            border-color: #f59e0b;
+        }
+
+        .mapped-item {
+            background: #475569;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            border-left: 4px solid #10b981;
+        }
+
+        .mapped-item small {
+            color: #94a3b8;
+            display: block;
+            margin-top: 4px;
+        }
+
+        .remove-btn {
+            float: right;
+            color: #ef4444;
+            cursor: pointer;
+            padding: 2px 8px;
+        }
+
+        .remove-btn:hover {
+            background: #7f1d1d;
+            border-radius: 4px;
+        }
+
+        .export-btn {
+            background: #10b981;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            margin: 10px;
+        }
+
+        .export-btn:hover {
+            background: #059669;
+        }
+
+        .stats {
+            background: #475569;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔗 手動對應工具</h1>
+
+        <div class="upload-section">
+            <h3 style="margin-bottom: 15px;">上傳檔案</h3>
+            <div class="upload-box" onclick="document.getElementById('pickingInput').click()">
+                <div>📦 上傳撿貨單</div>
+                <small style="color: #94a3b8;">MOMO/官網 Excel 或 蝦皮 PDF</small>
+                <input type="file" id="pickingInput" accept=".xlsx,.pdf">
+            </div>
+            <button class="export-btn" onclick="exportMappings()">💾 匯出對應關係</button>
+            <button class="export-btn" style="background: #3b82f6;" onclick="clearMappings()">🗑️ 清除所有對應</button>
+        </div>
+
+        <div class="mapping-area">
+            <div class="panel">
+                <h2>📦 撿貨單商品</h2>
+                <div class="stats" id="pickingStats" style="display: none;">
+                    <strong>總數：</strong><span id="pickingCount">0</span>
+                </div>
+                <div class="product-list" id="pickingList">
+                    <p style="color: #94a3b8; padding: 20px; text-align: center;">請上傳撿貨單</p>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>📊 報表商品與規格</h2>
+                <div class="stats">
+                    已載入 <span id="templateCount">0</span> 個商品模板
+                </div>
+                <div class="product-list" id="templateList"></div>
+            </div>
+
+            <div class="panel">
+                <h2>✅ 已對應清單</h2>
+                <div class="stats" id="mappedStats">
+                    已對應：<span id="mappedCount">0</span> 個
+                </div>
+                <div class="product-list" id="mappedList">
+                    <p style="color: #94a3b8; padding: 20px; text-align: center;">尚無對應</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        // 直接嵌入商品規格配置
+        const productMapping = {
+            "豆塔-蔓越莓": { "columns": { "B": "10入袋裝", "D": "單顆" } },
+            "豆塔-焦糖": { "columns": { "B": "10入袋裝", "D": "單顆" } },
+            "豆塔-巧克力": { "columns": { "B": "10入袋裝", "D": "單顆" } },
+            "豆塔-抹茶": { "columns": { "B": "10入袋裝", "D": "單顆" } },
+            "豆塔-椒麻": { "columns": { "B": "10入袋裝", "D": "單顆" } },
+            "堅果塔-蜂蜜": { "columns": { "B": "10入袋裝", "D": "單顆" } },
+            "堅果塔-焦糖": { "columns": { "B": "10入袋裝", "D": "單顆" } },
+            "堅果塔-巧克力": { "columns": { "B": "10入袋裝", "D": "單顆" } },
+            "堅果塔-海苔": { "columns": { "B": "10入袋裝", "D": "單顆" } },
+            "堅果塔-咖哩": { "columns": { "B": "10入袋裝", "D": "單顆" } },
+            "豆塔-綜合": { "columns": { "B": "10入袋裝", "D": "單顆" } },
+            "堅果塔-綜合": { "columns": { "B": "10入袋裝", "D": "單顆" } },
+            "雙塔": { "columns": { "B": "10入袋裝", "D": "單顆" } },
+            "土鳳梨酥(紅點)": { "columns": { "B": "8入袋裝", "C": "12入袋裝" } },
+            "鳳凰酥": { "columns": { "B": "8入袋裝", "C": "12入袋裝" } },
+            "雪花餅-綜合": { "columns": { "B": "10入袋裝", "C": "15入袋裝", "D": "單個" } },
+            "雪花餅-蔓越莓": { "columns": { "B": "10入袋裝", "C": "15入袋裝", "D": "單個" } },
+            "雪花餅-巧克力": { "columns": { "B": "10入袋裝", "C": "15入袋裝", "D": "單個" } },
+            "雪花餅-金沙": { "columns": { "B": "10入袋裝", "C": "15入袋裝", "D": "單個" } },
+            "雪花餅-抹茶": { "columns": { "B": "10入袋裝", "C": "15入袋裝", "D": "單個" } },
+            "雪花餅-肉鬆": { "columns": { "B": "10入袋裝", "C": "15入袋裝", "D": "單個" } },
+            "瑪德蓮-綜合": { "columns": { "B": "10入袋裝", "C": "單個" } },
+            "瑪德蓮-蜂蜜": { "columns": { "B": "10入袋裝", "C": "單個" } },
+            "瑪德蓮-巧克力": { "columns": { "B": "10入袋裝", "C": "單個" } },
+            "瑪德蓮-紅茶": { "columns": { "B": "10入袋裝", "C": "單個" } },
+            "瑪德蓮-抹茶": { "columns": { "B": "10入袋裝", "C": "單個" } },
+            "瑪德蓮-柑橘": { "columns": { "B": "10入袋裝", "C": "單個" } },
+            "瑪德蓮-檸檬": { "columns": { "B": "10入袋裝", "C": "單個" } },
+            "無調味綜合堅果": { "columns": { "B": "120g", "C": "280g" } },
+            "無調味夏威夷豆": { "columns": { "B": "120g", "C": "280g" } },
+            "無調味腰果": { "columns": { "B": "120g", "C": "280g" } },
+            "無調味杏仁": { "columns": { "B": "120g", "C": "280g" } },
+            "無調味核桃": { "columns": { "B": "120g", "C": "280g" } },
+            "★中東椰棗300g": { "columns": { "B": "300g" } },
+            "椰棗豆子150g": { "columns": { "B": "150g" } },
+            "椰棗腰果150g": { "columns": { "B": "150g" } },
+            "椰棗杏仁150g": { "columns": { "B": "150g" } },
+            "椰棗核桃150g": { "columns": { "B": "150g" } },
+            "牛奶糖": { "columns": { "C": "200g" } },
+            "牛奶糖-50g": { "columns": { "B": "50g" } },
+            "南棗核桃糕": { "columns": { "C": "200g" } },
+            "瓦片-綜合": { "columns": { "B": "90g", "C": "135g" } },
+            "瓦片-原味": { "columns": { "B": "90g", "C": "135g" } },
+            "瓦片-原味45克": { "columns": { "B": "45g" } },
+            "瓦片-紅茶": { "columns": { "B": "90g", "C": "135g" } },
+            "瓦片-巧克力": { "columns": { "B": "90g", "C": "135g" } },
+            "瓦片-海苔": { "columns": { "B": "90g", "C": "135g" } },
+            "瓦片-抹茶": { "columns": { "B": "90g", "C": "135g" } },
+            "瓦片-黑糖": { "columns": { "B": "90g", "C": "135g" } },
+            "瓦片-青花椒": { "columns": { "B": "90g", "C": "135g" } },
+            "奶油-焦糖牛奶": { "columns": { "B": "90g", "C": "135g" } },
+            "奶油-法國巧克力": { "columns": { "B": "90g", "C": "135g" } },
+            "奶油-蜂蜜檸檬": { "columns": { "B": "90g", "C": "135g" } },
+            "奶油-伯爵紅茶": { "columns": { "B": "90g", "C": "135g" } },
+            "奶油-抹茶": { "columns": { "B": "90g", "C": "135g" } },
+            "西點-綜合": { "columns": { "B": "90g", "C": "135g" } },
+            "西點-巧克力貝殼": { "columns": { "B": "90g", "C": "135g" } },
+            "西點-咖啡小花": { "columns": { "B": "90g", "C": "135g" } },
+            "西點-藍莓小花": { "columns": { "B": "90g", "C": "135g" } },
+            "西點-蔓越莓貝殼": { "columns": { "B": "90g", "C": "135g" } },
+            "西點-乳酪酥條": { "columns": { "B": "90g", "C": "135g" } },
+            "雙塔禮盒": { "columns": { "B": "禮盒" } },
+            "蔓越莓禮盒": { "columns": { "B": "禮盒" } },
+            "綜豆禮盒": { "columns": { "B": "禮盒" } },
+            "綜堅禮盒": { "columns": { "B": "禮盒" } },
+            "晴空塔餅禮盒": { "columns": { "B": "禮盒" } },
+            "暖暖幸福禮盒": { "columns": { "B": "禮盒" } },
+            "臻愛時光禮盒": { "columns": { "B": "禮盒" } },
+            "濃情滿載禮盒": { "columns": { "B": "禮盒" } },
+            "浪漫詩篇禮盒": { "columns": { "B": "禮盒" } },
+            "戀戀雪花禮盒": { "columns": { "B": "禮盒" } },
+            "午後漫步禮盒": { "columns": { "B": "禮盒" } },
+            "那年花開禮盒": { "columns": { "B": "禮盒" } },
+            "花間逸韻禮盒": { "columns": { "B": "禮盒" } },
+            "輕-香榭漫遊禮盒": { "columns": { "B": "禮盒" } },
+            "輕-晨曦物語禮盒": { "columns": { "B": "禮盒" } },
+            "輕-金緻典藏禮盒": { "columns": { "B": "禮盒" } },
+            "輕-月光序曲禮盒": { "columns": { "B": "禮盒" } }
+        };
+
+        let pickingProducts = [];
+        let mappings = [];
+        let selectedPickingIndex = null;
+        let nextPickingIndex = 0; // 用於給新商品分配唯一ID
+
+        // 初始化時顯示模板商品
+        displayTemplateProducts();
+
+        document.getElementById('pickingInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            let newProducts = [];
+            if (file.name.endsWith('.pdf')) {
+                newProducts = await parseShopeePDF(file);
+            } else {
+                newProducts = await parseExcel(file);
+            }
+
+            // 累加模式：將新商品加入現有列表
+            newProducts.forEach(p => {
+                p.index = nextPickingIndex++;
+                pickingProducts.push(p);
+            });
+
+            displayPickingProducts();
+
+            // 清空input，允許重複上傳同一檔案
+            e.target.value = '';
+        });
+
+        async function parseExcel(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+
+            // 檢測是否為官網（前6行是元數據）
+            const isOfficial = workbook.SheetNames[0].includes('官網') || file.name.includes('官網');
+            const data = XLSX.utils.sheet_to_json(worksheet, {
+                range: isOfficial ? 6 : 0
+            });
+
+            return data.map(row => ({
+                name: row['商品名稱'] || '',
+                spec: row['單品規格'] || row['規格'] || '',
+                quantity: parseInt(row['撿貨數量'] || row['數量'] || 0)
+            })).filter(p => p.name && p.quantity > 0 && !p.name.includes('運費'));
+        }
+
+        async function parseShopeePDF(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+            const allProducts = [];
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageItems = textContent.items.map(item => ({
+                    text: item.str.trim(),
+                    x: Math.round(item.transform[4]),
+                    y: Math.round(item.transform[5])
+                }));
+
+                const products = parseShopeePage(pageItems);
+                allProducts.push(...products);
+            }
+
+            return allProducts;
+        }
+
+        function parseShopeePage(items) {
+            const rows = groupByY(items);
+            const columnRanges = {
+                seq: { min: 32, max: 59 },
+                productName: { min: 166, max: 307 },
+                spec: { min: 308, max: 396 },
+                quantity: { min: 397, max: 520 }
+            };
+
+            let headerY = null;
+            for (let row of rows) {
+                if (row.items.some(i => i.text.includes('商品名稱'))) {
+                    headerY = row.y;
+                    break;
+                }
+            }
+
+            if (!headerY) return [];
+
+            const products = [];
+            let currentProduct = null;
+
+            rows.forEach(row => {
+                if (row.y >= headerY) return;
+
+                let seqNum = null;
+                row.items.forEach(item => {
+                    if (item.x >= columnRanges.seq.min && item.x <= columnRanges.seq.max) {
+                        const num = parseInt(item.text.trim());
+                        if (!isNaN(num) && num > 0) seqNum = num;
+                    }
+                });
+
+                if (seqNum) {
+                    if (currentProduct) products.push(currentProduct);
+                    currentProduct = { seq: seqNum, name: [], spec: [], quantity: null };
+                }
+
+                if (currentProduct) {
+                    const rowText = row.items.map(i => i.text).join(' ');
+                    if (rowText.includes('合計')) return;
+
+                    row.items.forEach(item => {
+                        const x = item.x;
+                        const t = item.text.trim();
+
+                        if (x >= columnRanges.productName.min && x <= columnRanges.productName.max) {
+                            if (!t.match(/^\d+$/)) currentProduct.name.push(t);
+                        } else if (x >= columnRanges.spec.min && x <= columnRanges.spec.max) {
+                            if (!t.match(/^\d+$/)) currentProduct.spec.push(t);
+                        } else if (x >= columnRanges.quantity.min && x <= columnRanges.quantity.max) {
+                            const num = parseInt(t);
+                            if (!isNaN(num) && num > 0) currentProduct.quantity = num;
+                        }
+                    });
+                }
+            });
+
+            if (currentProduct) products.push(currentProduct);
+
+            return products.filter(p => p.seq && p.seq > 0).map(p => ({
+                name: p.name.join(' '),
+                spec: p.spec.join(' '),
+                quantity: p.quantity || 0
+            }));
+        }
+
+        function groupByY(items, tolerance = 5) {
+            const sorted = [...items].sort((a, b) => b.y - a.y);
+            const groups = [];
+            sorted.forEach(item => {
+                let found = false;
+                for (let g of groups) {
+                    if (Math.abs(g.y - item.y) <= tolerance) {
+                        g.items.push(item);
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) groups.push({ y: item.y, items: [item] });
+            });
+            groups.forEach(g => g.items.sort((a, b) => a.x - b.x));
+            return groups;
+        }
+
+        function displayPickingProducts() {
+            document.getElementById('pickingStats').style.display = 'block';
+            document.getElementById('pickingCount').textContent = pickingProducts.length;
+
+            const list = document.getElementById('pickingList');
+            list.innerHTML = pickingProducts.map((p, i) => `
+                <div class="picking-item ${selectedPickingIndex === i ? 'selected' : ''}" 
+                     onclick="selectPickingProduct(${i})"
+                     id="picking-${i}">
+                    <div style="font-weight: 600;">${p.name}</div>
+                    <div style="color: #94a3b8; font-size: 0.85em; margin-top: 4px;">
+                        規格: ${p.spec || '(無)'} | 數量: ${p.quantity}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function displayTemplateProducts() {
+            const sorted = Object.keys(productMapping).sort();
+            document.getElementById('templateCount').textContent = sorted.length;
+
+            const list = document.getElementById('templateList');
+            list.innerHTML = sorted.map(productName => {
+                const specs = productMapping[productName].columns;
+                return `
+                    <div class="template-item">
+                        <div class="template-product-name">${productName}</div>
+                        <div class="spec-buttons">
+                            ${Object.entries(specs).map(([col, specName]) => `
+                                <div class="spec-btn" 
+                                     onclick="createMapping('${productName}', '${col}', '${specName}')">
+                                    欄${col}: ${specName}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectPickingProduct(index) {
+            selectedPickingIndex = index;
+            displayPickingProducts();
+        }
+
+        function createMapping(productName, column, specName) {
+            if (selectedPickingIndex === null) {
+                alert('請先選擇撿貨單商品');
+                return;
+            }
+
+            const picking = pickingProducts[selectedPickingIndex];
+
+            mappings.push({
+                pickingName: picking.name,
+                pickingSpec: picking.spec,
+                pickingQuantity: picking.quantity,
+                templateProduct: productName,
+                templateColumn: column,
+                templateSpec: specName
+            });
+
+            // 取消選擇
+            selectedPickingIndex = null;
+            displayPickingProducts();
+            displayMappedList();
+        }
+
+        function displayMappedList() {
+            document.getElementById('mappedCount').textContent = mappings.length;
+
+            const list = document.getElementById('mappedList');
+            if (mappings.length === 0) {
+                list.innerHTML = '<p style="color: #94a3b8; padding: 20px; text-align: center;">尚無對應</p>';
+                return;
+            }
+
+            list.innerHTML = mappings.map((m, i) => `
+                <div class="mapped-item">
+                    <span class="remove-btn" onclick="removeMapping(${i})">✕</span>
+                    <div style="font-weight: 600;">${m.pickingName}</div>
+                    <small>撿貨單規格: ${m.pickingSpec} | 數量: ${m.pickingQuantity}</small>
+                    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #334155;">
+                        <strong style="color: #10b981;">→ ${m.templateProduct}</strong>
+                        <small style="display: block;">欄${m.templateColumn}: ${m.templateSpec}</small>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function removeMapping(index) {
+            mappings.splice(index, 1);
+            displayMappedList();
+        }
+
+        function exportMappings() {
+            const dataStr = JSON.stringify(mappings, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `mapping-${new Date().getTime()}.json`;
+            a.click();
+        }
+
+        function clearMappings() {
+            if (confirm('確定要清除所有對應關係嗎？')) {
+                mappings = [];
+                displayMappedList();
+            }
+        }
+    </script>
+</body>
+
+</html>

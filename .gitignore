@@ -1,0 +1,12 @@
+# Sample data (contains private business data)
+sample-data/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+.vscode/
+.idea/

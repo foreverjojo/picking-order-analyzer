@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF 座標分析工具</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #3b82f6;
+            margin-bottom: 20px;
+        }
+
+        .upload-box {
+            background: #334155;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            text-align: center;
+            cursor: pointer;
+            border: 2px dashed #64748b;
+        }
+
+        .upload-box:hover {
+            border-color: #3b82f6;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .results {
+            background: #334155;
+            padding: 30px;
+            border-radius: 12px;
+        }
+
+        .controls {
+            background: #475569;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .controls label {
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .controls input[type="number"] {
+            width: 100px;
+            padding: 5px;
+            margin: 0 10px;
+            background: #334155;
+            border: 1px solid #64748b;
+            color: #f1f5f9;
+            border-radius: 4px;
+        }
+
+        .controls button {
+            padding: 8px 16px;
+            margin: 5px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .controls button:hover {
+            background: #2563eb;
+        }
+
+        .pdf-view {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        canvas {
+            max-width: 100%;
+            border: 1px solid #cbd5e1;
+        }
+
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+            display: block;
+        }
+
+        .items-table thead {
+            position: sticky;
+            top: 0;
+            background: #475569;
+        }
+
+        .items-table th,
+        .items-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #475569;
+            font-size: 0.9em;
+        }
+
+        .items-table th {
+            font-weight: 600;
+        }
+
+        .items-table tr:hover {
+            background: #2d3748;
+        }
+
+        .highlight {
+            background: rgba(251, 191, 36, 0.3);
+        }
+
+        .row-group {
+            background: #1e293b;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 3px solid #3b82f6;
+        }
+
+        .row-group-header {
+            color: #60a5fa;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .row-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .item-badge {
+            background: #475569;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+
+        .item-badge:hover {
+            background: #64748b;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>📐 PDF 座標分析工具</h1>
+
+        <div class="upload-box" id="uploadBox">
+            <div style="font-size: 3em; margin-bottom: 10px;">📤</div>
+            <p style="font-size: 1.2em;">點擊或拖放 PDF 檔案</p>
+            <p style="color: #cbd5e1; margin-top: 10px;">上傳後可查看每個文字的 X、Y 座標</p>
+            <input type="file" id="fileInput" accept=".pdf">
+        </div>
+
+        <div class="results" id="results" style="display: none;">
+            <div class="controls">
+                <h3 style="margin-bottom: 15px; color: #60a5fa;">🔍 篩選工具</h3>
+                <label>
+                    📍 X 座標範圍篩選：
+                    <input type="number" id="minX" placeholder="最小 X"> ~
+                    <input type="number" id="maxX" placeholder="最大 X">
+                    <button onclick="filterByX()">篩選</button>
+                    <button onclick="clearFilter()">清除篩選</button>
+                </label>
+                <label>
+                    📊 顯示模式：
+                    <button onclick="switchView('table')">表格視圖</button>
+                    <button onclick="switchView('grouped')">按行分組</button>
+                </label>
+            </div>
+
+            <div class="pdf-view">
+                <h3 style="color: #1e293b; margin-bottom: 15px;">📄 PDF 視覺效果</h3>
+                <div id="pdfCanvas"></div>
+            </div>
+
+            <h3 style="margin-top: 30px;">📋 文字項目座標列表</h3>
+            <div id="tableView">
+                <table class="items-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>文字內容</th>
+                            <th>X 座標</th>
+                            <th>Y 座標</th>
+                            <th>寬度</th>
+                            <th>高度</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsTableBody"></tbody>
+                </table>
+            </div>
+
+            <div id="groupedView" style="display: none;">
+                <div id="groupedContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        const uploadBox = document.getElementById('uploadBox');
+        const fileInput = document.getElementById('fileInput');
+        let allItems = [];
+        let filteredItems = [];
+
+        uploadBox.addEventListener('click', () => fileInput.click());
+        uploadBox.addEventListener('dragover', (e) => { e.preventDefault(); uploadBox.style.borderColor = '#3b82f6'; });
+        uploadBox.addEventListener('dragleave', () => { uploadBox.style.borderColor = '#64748b'; });
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.style.borderColor = '#64748b';
+            if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) handleFile(e.target.files[0]);
+        });
+
+        async function handleFile(file) {
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+                // 渲染第一頁為圖片
+                const page = await pdf.getPage(1);
+                const scale = 1.5;
+                const viewport = page.getViewport({ scale: scale });
+
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+
+                document.getElementById('pdfCanvas').innerHTML = '';
+                document.getElementById('pdfCanvas').appendChild(canvas);
+
+                // 提取所有文字項目
+                allItems = [];
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const pg = await pdf.getPage(i);
+                    const textContent = await pg.getTextContent();
+                    textContent.items.forEach((item, index) => {
+                        allItems.push({
+                            page: i,
+                            index: index,
+                            text: item.str,
+                            x: Math.round(item.transform[4]),
+                            y: Math.round(item.transform[5]),
+                            width: Math.round(item.width),
+                            height: Math.round(item.height)
+                        });
+                    });
+                }
+
+                filteredItems = [...allItems];
+                displayItems(filteredItems);
+                document.getElementById('results').style.display = 'block';
+
+            } catch (error) {
+                alert('解析失敗：' + error.message);
+            }
+        }
+
+        function displayItems(items) {
+            const tbody = document.getElementById('itemsTableBody');
+            tbody.innerHTML = items.map((item, i) => `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td style="max-width: 300px; word-break: break-all;">${escapeHtml(item.text)}</td>
+                    <td><strong>${item.x}</strong></td>
+                    <td>${item.y}</td>
+                    <td>${item.width}</td>
+                    <td>${item.height}</td>
+                </tr>
+            `).join('');
+
+            // 按行分組視圖
+            const grouped = groupByY(items);
+            const groupedContainer = document.getElementById('groupedContainer');
+            groupedContainer.innerHTML = grouped.map((group, i) => `
+                <div class="row-group">
+                    <div class="row-group-header">第 ${i + 1} 行 (Y: ${group.y}) - ${group.items.length} 個項目</div>
+                    <div class="row-items">
+                        ${group.items.map(item => `
+                            <div class="item-badge" title="X: ${item.x}, 文字: ${item.text}">
+                                <strong>X:${item.x}</strong> "${escapeHtml(item.text.substring(0, 20))}"
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function groupByY(items, tolerance = 5) {
+            const sorted = [...items].sort((a, b) => b.y - a.y);
+            const groups = [];
+            sorted.forEach(item => {
+                let found = false;
+                for (let g of groups) {
+                    if (Math.abs(g.y - item.y) <= tolerance) {
+                        g.items.push(item);
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) groups.push({ y: item.y, items: [item] });
+            });
+            groups.forEach(g => g.items.sort((a, b) => a.x - b.x));
+            return groups;
+        }
+
+        function filterByX() {
+            const minX = parseInt(document.getElementById('minX').value) || 0;
+            const maxX = parseInt(document.getElementById('maxX').value) || 9999;
+
+            filteredItems = allItems.filter(item => item.x >= minX && item.x <= maxX);
+            displayItems(filteredItems);
+
+            console.log(`篩選結果: X 範圍 ${minX}-${maxX}，找到 ${filteredItems.length} 個項目`);
+        }
+
+        function clearFilter() {
+            document.getElementById('minX').value = '';
+            document.getElementById('maxX').value = '';
+            filteredItems = [...allItems];
+            displayItems(filteredItems);
+        }
+
+        function switchView(view) {
+            if (view === 'table') {
+                document.getElementById('tableView').style.display = 'block';
+                document.getElementById('groupedView').style.display = 'none';
+            } else {
+                document.getElementById('tableView').style.display = 'none';
+                document.getElementById('groupedView').style.display = 'block';
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+
+</html>

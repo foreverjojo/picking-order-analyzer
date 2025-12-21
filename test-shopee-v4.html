@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>蝦皮撿貨單測試 v4</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #ef4444;
+            margin-bottom: 20px;
+        }
+
+        .upload-box {
+            background: #334155;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            text-align: center;
+            cursor: pointer;
+            border: 2px dashed #64748b;
+        }
+
+        .upload-box:hover {
+            border-color: #ef4444;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .results {
+            background: #334155;
+            padding: 30px;
+            border-radius: 12px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #475569;
+        }
+
+        th {
+            background: #475569;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #2d3748;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: #475569;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #ef4444;
+        }
+
+        .stat-label {
+            color: #cbd5e1;
+            margin-top: 5px;
+        }
+
+        pre {
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 0.85em;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🦐 蝦皮 PDF 撿貨單測試 (v4 - 精確座標版)</h1>
+
+        <div class="upload-box" id="uploadBox">
+            <div style="font-size: 3em; margin-bottom: 10px;">📤</div>
+            <p style="font-size: 1.2em;">點擊或拖放蝦皮 PDF 撿貨單</p>
+            <p style="color: #cbd5e1; margin-top: 10px;">使用精確 X 座標範圍解析</p>
+            <input type="file" id="fileInput" accept=".pdf">
+        </div>
+
+        <div class="results" id="results" style="display: none;">
+            <h2>解析結果</h2>
+
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="productCount">0</div>
+                    <div class="stat-label">商品數</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalQty">0</div>
+                    <div class="stat-label">總數量</div>
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>序號</th>
+                        <th>商品名稱</th>
+                        <th>規格</th>
+                        <th>出貨數量</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+
+            <h3 style="margin-top: 30px;">調試資訊</h3>
+            <pre id="debug"></pre>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        const uploadBox = document.getElementById('uploadBox');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadBox.addEventListener('click', () => fileInput.click());
+        uploadBox.addEventListener('dragover', (e) => { e.preventDefault(); uploadBox.style.borderColor = '#ef4444'; });
+        uploadBox.addEventListener('dragleave', () => { uploadBox.style.borderColor = '#64748b'; });
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.style.borderColor = '#64748b';
+            if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) handleFile(e.target.files[0]);
+        });
+
+        async function handleFile(file) {
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+                // 為每個 PDF 頁面分別處理
+                const allProducts = [];
+
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+
+                    const pageItems = [];
+                    textContent.items.forEach(item => {
+                        pageItems.push({
+                            text: item.str.trim(),
+                            x: Math.round(item.transform[4]),
+                            y: Math.round(item.transform[5])
+                        });
+                    });
+
+                    console.log(`\n處理 PDF 第 ${i} 頁...`);
+                    const products = parseShopeePDF(pageItems, i);
+                    allProducts.push(...products);
+                }
+
+                displayResults(allProducts);
+
+            } catch (error) {
+                alert('解析失敗：' + error.message);
+            }
+        }
+
+        function parseShopeePDF(items, pageNum) {
+            const rows = groupByY(items);
+
+            // 欄位範圍（每個 PDF 頁面都相同）
+            const columnRanges = {
+                seq: { min: 32, max: 59 },
+                productName: { min: 166, max: 307 },
+                spec: { min: 308, max: 396 },
+                quantity: { min: 397, max: 520 }
+            };
+
+            console.log(`  📊 PDF第${pageNum}頁，總行數:`, rows.length);
+
+            // 找標題行
+            let headerY = null;
+            for (let row of rows) {
+                const text = row.items.map(i => i.text).join(' ');
+                if (text.includes('商品名稱') && text.includes('出貨數量')) {
+                    headerY = row.y;
+                    console.log(`  ✅ 找到標題行，Y軸: ${headerY}`);
+                    break;
+                }
+            }
+
+            if (!headerY) {
+                console.log(`  ⚠️ PDF第${pageNum}頁未找到標題行`);
+                return [];
+            }
+
+            // 解析商品 - 支援多行商品
+            const products = [];
+            let currentProduct = null;
+
+            rows.forEach(row => {
+                if (row.y >= headerY) return;
+
+                // 檢查是否有序號（新商品開始）
+                let seqNum = null;
+                row.items.forEach(item => {
+                    const x = item.x;
+                    const t = item.text.trim();
+                    if (x >= columnRanges.seq.min && x <= columnRanges.seq.max) {
+                        const num = parseInt(t);
+                        if (!isNaN(num) && num > 0) {
+                            seqNum = num;
+                        }
+                    }
+                });
+
+                // 如果找到序號，代表新商品開始
+                if (seqNum) {
+                    // 保存前一個商品
+                    if (currentProduct) {
+                        products.push(currentProduct);
+                    }
+
+                    // 開始新商品
+                    currentProduct = {
+                        seq: seqNum,
+                        name: [],
+                        spec: [],
+                        quantity: null
+                    };
+                }
+
+                // 提取當前行的資料（加入當前商品）
+                if (currentProduct) {
+                    // 檢查這一行是否包含「合計」（總計行）
+                    const rowText = row.items.map(i => i.text).join(' ');
+                    if (rowText.includes('合計')) {
+                        return; // 跳過合計行，不合併到商品中
+                    }
+
+                    row.items.forEach(item => {
+                        const x = item.x;
+                        const t = item.text.trim();
+
+                        // 商品名稱
+                        if (x >= columnRanges.productName.min && x <= columnRanges.productName.max) {
+                            if (!t.match(/^\d+$/)) {
+                                currentProduct.name.push(t);
+                            }
+                        }
+                        // 規格
+                        else if (x >= columnRanges.spec.min && x <= columnRanges.spec.max) {
+                            if (!t.match(/^\d+$/)) {
+                                currentProduct.spec.push(t);
+                            }
+                        }
+                        // 出貨數量
+                        else if (x >= columnRanges.quantity.min && x <= columnRanges.quantity.max) {
+                            const num = parseInt(t);
+                            if (!isNaN(num) && num > 0) {
+                                currentProduct.quantity = num;
+                            }
+                        }
+                    });
+                }
+            });
+
+            // 保存最後一個商品
+            if (currentProduct) {
+                products.push(currentProduct);
+            }
+
+            // 格式化結果（只保留有有效序號的商品）
+            const formattedProducts = products
+                .filter(p => p.seq && p.seq > 0) // 只保留有序號的商品，排除「合計」等無序號的行
+                .map(p => ({
+                    seq: p.seq,
+                    name: p.name.join(' '),
+                    spec: p.spec.join(' '),
+                    quantity: p.quantity || 0
+                }));
+
+            console.log(`  ✅ PDF第${pageNum}頁提取 ${formattedProducts.length} 個商品`);
+            return formattedProducts;
+        }
+
+        function groupByY(items, tolerance = 5) {
+            const sorted = [...items].sort((a, b) => b.y - a.y);
+            const groups = [];
+            sorted.forEach(item => {
+                let found = false;
+                for (let g of groups) {
+                    if (Math.abs(g.y - item.y) <= tolerance) {
+                        g.items.push(item);
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) groups.push({ y: item.y, items: [item] });
+            });
+            groups.forEach(g => g.items.sort((a, b) => a.x - b.x));
+            return groups;
+        }
+
+        function displayResults(products) {
+            document.getElementById('results').style.display = 'block';
+            document.getElementById('productCount').textContent = products.length;
+            document.getElementById('totalQty').textContent = products.reduce((s, p) => s + p.quantity, 0);
+
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = products.map(p => `
+                <tr>
+                    <td>序${p.seq}</td>
+                    <td>${p.name || '<span style="color:#94a3b8;">(空)</span>'}</td>
+                    <td>${p.spec || '<span style="color:#94a3b8;">(空)</span>'}</td>
+                    <td><strong>${p.quantity}</strong></td>
+                </tr>
+            `).join('');
+
+            document.getElementById('debug').textContent = JSON.stringify(products.slice(0, 10), null, 2);
+        }
+    </script>
+</body>
+
+</html>
