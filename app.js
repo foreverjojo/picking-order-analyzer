@@ -607,6 +607,95 @@ async function parseTemplateExcel(file) {
 }
 
 // ==================== 商品整合 ====================
+
+// 拆分特殊商品規則
+function splitSpecialProducts(products) {
+    const result = [];
+
+    products.forEach(product => {
+        const fullText = ((product.name || '') + (product.spec || '')).replace(/\s+/g, '');
+
+        // 胖貝殼瑪德蓮-2入 拆分為 蜂蜜 + 巧克力（固定組合）
+        if (/胖貝殼瑪德蓮/.test(fullText) && /2入/.test(fullText)) {
+            console.log(`拆分商品: ${product.name} (數量 ${product.quantity}) → 蜂蜜 + 巧克力 各 ${product.quantity}`);
+
+            // 拆成兩筆，每筆數量與原始訂單相同
+            result.push({
+                ...product,
+                name: '瑪德蓮-蜂蜜（活動拆分）',
+                spec: '單顆',
+                quantity: product.quantity,
+                originalName: product.name,
+                originalSpec: product.spec,
+                isSplit: true
+            });
+            result.push({
+                ...product,
+                name: '瑪德蓮-巧克力（活動拆分）',
+                spec: '單顆',
+                quantity: product.quantity,
+                originalName: product.name,
+                originalSpec: product.spec,
+                isSplit: true
+            });
+        }
+        // 夏威夷豆塔組合包：10入蜂蜜蔓越莓x2包+10入焦糖口味x1包 拆分為 蔓越莓 + 焦糖
+        else if (/夏威夷豆塔/.test(fullText) && /蜂蜜蔓越莓.*2包/.test(fullText) && /焦糖.*1包/.test(fullText)) {
+            console.log(`拆分商品: ${product.name} (數量 ${product.quantity}) → 蔓越莓 ${product.quantity * 2}包 + 焦糖 ${product.quantity}包`);
+
+            // 蔓越莓 x2包
+            result.push({
+                ...product,
+                name: '豆塔-蔓越莓（組合拆分）',
+                spec: '10入袋裝',
+                quantity: product.quantity * 2,
+                originalName: product.name,
+                originalSpec: product.spec,
+                isSplit: true
+            });
+            // 焦糖 x1包
+            result.push({
+                ...product,
+                name: '豆塔-焦糖（組合拆分）',
+                spec: '10入袋裝',
+                quantity: product.quantity * 1,
+                originalName: product.name,
+                originalSpec: product.spec,
+                isSplit: true
+            });
+        }
+        // 夏威夷豆塔組合包：10入焦糖口味x2包+10入蜂蜜蔓越莓x1包 拆分為 焦糖 + 蔓越莓（順序相反）
+        else if (/夏威夷豆塔/.test(fullText) && /焦糖.*2包/.test(fullText) && /蜂蜜蔓越莓.*1包/.test(fullText)) {
+            console.log(`拆分商品: ${product.name} (數量 ${product.quantity}) → 焦糖 ${product.quantity * 2}包 + 蔓越莓 ${product.quantity}包`);
+
+            // 焦糖 x2包
+            result.push({
+                ...product,
+                name: '豆塔-焦糖（組合拆分）',
+                spec: '10入袋裝',
+                quantity: product.quantity * 2,
+                originalName: product.name,
+                originalSpec: product.spec,
+                isSplit: true
+            });
+            // 蔓越莓 x1包
+            result.push({
+                ...product,
+                name: '豆塔-蔓越莓（組合拆分）',
+                spec: '10入袋裝',
+                quantity: product.quantity * 1,
+                originalName: product.name,
+                originalSpec: product.spec,
+                isSplit: true
+            });
+        } else {
+            result.push(product);
+        }
+    });
+
+    return result;
+}
+
 function consolidateProducts() {
     allProducts = [];
     mappedProducts = [];
@@ -623,6 +712,9 @@ function consolidateProducts() {
             allProducts.push({ ...product });
         }
     });
+
+    // 拆分特殊商品（如：胖貝殼瑪德蓮-2入 → 蜂蜜 + 巧克力）
+    allProducts = splitSpecialProducts(allProducts);
 
     // 應用智慧映射
     allProducts.forEach(product => {
@@ -860,7 +952,7 @@ function confirmMapping() {
                         quantity: 0
                     };
                 }
-                statistics[key].quantity += product.quantity;
+                statistics[key].quantity += product.mappedQuantity || product.quantity;
             });
 
             console.log('統計結果:', statistics);

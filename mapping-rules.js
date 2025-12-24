@@ -24,7 +24,7 @@ const standardProductNames = [
     // 奶油
     '奶油-焦糖牛奶', '奶油-法國巧克力', '奶油-蜂蜜檸檬', '奶油-伯爵紅茶', '奶油-抹茶',
     // 西點
-    '千層小酥條-原味', '西點-綜合', '西點-巧克力貝殼', '西點-咖啡小花', '西點-藍莓小花', '西點-蔓越莓貝殼', '西點-乳酪酥條',
+    '千層-小酥條', '西點-綜合', '西點-巧克力貝殼', '西點-咖啡小花', '西點-藍莓小花', '西點-蔓越莓貝殼', '西點-乳酪酥條',
     // 禮盒
     '雙塔禮盒', '蔓越莓禮盒', '綜豆禮盒', '綜堅禮盒', '晴空塔餅禮盒', '暖暖幸福禮盒', '臻愛時光禮盒', '濃情滿載禮盒',
     '浪漫詩篇禮盒', '戀戀雪花禮盒', '午後漫步禮盒', '那年花開禮盒', '花間逸韻禮盒',
@@ -57,6 +57,44 @@ function normalizeProductName(name) {
 
 // 根據平台選擇映射函數
 function autoMapProduct(pickingName, pickingSpec, quantity, platform = 'shopee') {
+    // 優先處理已拆分商品（不管任何平台）
+    if (/活動拆分/.test(pickingName)) {
+        let flavor = null;
+        if (/蜂蜜/.test(pickingName)) flavor = '瑪德蓮-蜂蜜';
+        else if (/巧克力/.test(pickingName)) flavor = '瑪德蓮-巧克力';
+
+        if (flavor) {
+            console.log(`拆分商品映射: ${pickingName} → ${flavor}, C欄, 單顆, 數量 ${quantity}`);
+            return {
+                templateProduct: flavor,
+                templateColumn: 'C',
+                templateSpec: '單顆',
+                multiplier: 1,
+                mappedQuantity: quantity,
+                confidence: 0.95
+            };
+        }
+    }
+
+    // 處理組合拆分商品（豆塔組合包）
+    if (/組合拆分/.test(pickingName)) {
+        let flavor = null;
+        if (/蔓越莓/.test(pickingName)) flavor = '豆塔-蔓越莓';
+        else if (/焦糖/.test(pickingName)) flavor = '豆塔-焦糖';
+
+        if (flavor) {
+            console.log(`組合拆分映射: ${pickingName} → ${flavor}, B欄, 10入袋裝, 數量 ${quantity}`);
+            return {
+                templateProduct: flavor,
+                templateColumn: 'B',
+                templateSpec: '10入袋裝',
+                multiplier: 1,
+                mappedQuantity: quantity,
+                confidence: 0.95
+            };
+        }
+    }
+
     if (platform === 'momo' || platform === 'official') {
         return autoMapProductMomo(pickingName, pickingSpec, quantity);
     } else if (platform === 'orangepoint') {
@@ -222,6 +260,14 @@ function autoMapProductMomo(pickingName, pickingSpec, quantity) {
         confidence = 0.9;
     }
 
+    // === 千層小酥條 ===
+    if (!productName && /千層.*小酥條|小酥條/.test(fullTextNoSpace)) {
+        productName = '千層-小酥條';
+        column = 'B';
+        spec = '小包裝';
+        confidence = 0.95;
+    }
+
     // === 無調味堅果 ===
     if (!productName && /無調味堅果/.test(fullTextNoSpace)) {
         if (/綜合|原味綜合/.test(fullTextNoSpace)) productName = '無調味綜合堅果';
@@ -344,7 +390,7 @@ function autoMapProductShopee(pickingName, pickingSpec, quantity) {
     const specNoSpace = pickingSpec.replace(/\s+/g, '');
     const nameNoSpace = productName.replace(/\s+/g, '');
 
-    // 2. 優先從規格中提取口味
+    // 2. 優先從規格中提取口味（拆分商品已在 autoMapProduct 中處理）
     let extractedFlavor = null;
 
     // === 禮盒類型判斷 ===
@@ -406,18 +452,19 @@ function autoMapProductShopee(pickingName, pickingSpec, quantity) {
     }
 
     // === 杏仁瓦片口味 ===
-    if (!extractedFlavor && /杏仁瓦片/.test(specNoSpace)) {
+    // 檢查商品名稱或規格中是否包含「杏仁瓦片」
+    if (!extractedFlavor && (/杏仁瓦片/.test(specNoSpace) || /杏仁瓦片/.test(nameNoSpace))) {
         // 優先判斷 45g 原味，直接映射到完整名稱
-        if (/原味/.test(specNoSpace) && /45g/.test(specNoSpace)) {
+        if (/原味/.test(fullTextNoSpace) && /45g/.test(fullTextNoSpace)) {
             extractedFlavor = '瓦片-原味45克';
-        } else if (/原味/.test(specNoSpace)) extractedFlavor = '瓦片-原味';
-        else if (/抹茶/.test(specNoSpace)) extractedFlavor = '瓦片-抹茶';
-        else if (/紅茶/.test(specNoSpace)) extractedFlavor = '瓦片-紅茶';
-        else if (/巧克力/.test(specNoSpace)) extractedFlavor = '瓦片-巧克力';
-        else if (/海苔/.test(specNoSpace)) extractedFlavor = '瓦片-海苔';
-        else if (/黑糖/.test(specNoSpace)) extractedFlavor = '瓦片-黑糖';
-        else if (/青花椒/.test(specNoSpace)) extractedFlavor = '瓦片-青花椒';
-        else if (/綜合/.test(specNoSpace)) extractedFlavor = '瓦片-綜合';
+        } else if (/原味/.test(specNoSpace) || /原味/.test(nameNoSpace)) extractedFlavor = '瓦片-原味';
+        else if (/抹茶/.test(specNoSpace) || /抹茶/.test(nameNoSpace)) extractedFlavor = '瓦片-抹茶';
+        else if (/紅茶/.test(specNoSpace) || /紅茶/.test(nameNoSpace)) extractedFlavor = '瓦片-紅茶';
+        else if (/巧克力/.test(specNoSpace) || /巧克力/.test(nameNoSpace)) extractedFlavor = '瓦片-巧克力';
+        else if (/海苔/.test(specNoSpace) || /海苔/.test(nameNoSpace)) extractedFlavor = '瓦片-海苔';
+        else if (/黑糖/.test(specNoSpace) || /黑糖/.test(nameNoSpace)) extractedFlavor = '瓦片-黑糖';
+        else if (/青花椒/.test(specNoSpace) || /青花椒/.test(nameNoSpace)) extractedFlavor = '瓦片-青花椒';
+        else if (/綜合/.test(specNoSpace) || /綜合/.test(nameNoSpace)) extractedFlavor = '瓦片-綜合';
     }
 
     // === 50g牛奶糖 ===
@@ -488,6 +535,11 @@ function autoMapProductShopee(pickingName, pickingSpec, quantity) {
         else if (/法國巧克力|巧克力/.test(fullTextNoSpace)) extractedFlavor = '奶油-法國巧克力';
         else if (/蜂蜜檸檬/.test(fullTextNoSpace)) extractedFlavor = '奶油-蜂蜜檸檬';
         else if (/伯爵紅茶/.test(fullTextNoSpace)) extractedFlavor = '奶油-伯爵紅茶';
+    }
+
+    // === 千層小酥條 ===
+    if (!extractedFlavor && /千層.*小酥條|小酥條/.test(fullTextNoSpace)) {
+        extractedFlavor = '千層-小酥條';
     }
 
     // === 從規格提取堅果塔口味 ===
@@ -593,6 +645,10 @@ function autoMapProductShopee(pickingName, pickingSpec, quantity) {
     // 瓦片-原味45克 是獨立產品，不需要額外設置欄位規格
     else if (productName === '瓦片-原味45克') {
         column = 'B'; spec = null; confidence = 0.95; multiplier = 1;
+    }
+    // 千層小酥條 - 直接映射到 B 欄/小包裝
+    else if (productName === '千層-小酥條') {
+        column = 'B'; spec = '小包裝'; confidence = 0.95; multiplier = 1;
     }
     // 從規格提取重量（優先）
     else if (/45g/.test(pickingSpec)) { column = 'B'; spec = '45g'; confidence = 0.95; multiplier = 1; }
