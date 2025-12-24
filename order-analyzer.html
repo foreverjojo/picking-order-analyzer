@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>撿貨單分析系統 - IVY FOODIE PALACE</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- SheetJS for Excel processing -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <!-- ExcelJS for preserving styles -->
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+    <!-- JSZip for direct xlsx manipulation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- PDF.js for PDF parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <div style="margin-bottom: 20px;">
+            <a href="index.html" class="btn btn-secondary" style="text-decoration: none;">← 回首頁</a>
+        </div>
+        <header>
+            <h1>📦 撿貨單分析系統</h1>
+            <p class="subtitle">IVY FOODIE PALACE - 自動化生產統計</p>
+        </header>
+
+        <main>
+            <!-- Step 1: 檔案上傳 -->
+            <section class="step-section" id="step1">
+                <div class="step-header">
+                    <span class="step-number">步驟 1</span>
+                    <h2>上傳檔案</h2>
+                </div>
+                <div class="upload-area">
+                    <div class="upload-box" id="uploadBox">
+                        <div class="upload-icon">📤</div>
+                        <p class="upload-text">拖放撿貨單到這裡或點擊選擇檔案</p>
+                        <p class="upload-hint">支援 MOMO (.xlsx)、官網 (.xlsx)、蝦皮 (.pdf)、橘點子 (.xls)</p>
+                        <input type="file" id="fileInput" multiple accept=".xlsx,.xls,.pdf" hidden>
+                    </div>
+                    <div class="file-list" id="fileList"></div>
+                </div>
+                <button class="btn btn-primary" id="parseBtn" disabled>
+                    <span>🔍 解析撿貨單</span>
+                </button>
+            </section>
+
+            <!-- Step 2: 商品對應 -->
+            <section class="step-section hidden" id="step2">
+                <div class="step-header">
+                    <span class="step-number">步驟 2</span>
+                    <h2>設定商品對應</h2>
+                </div>
+                <div class="mapping-controls">
+                    <button class="btn btn-secondary" id="addMoreFilesBtn">📤 上傳更多撿貨單</button>
+                    <input type="file" id="additionalFileInput" multiple accept=".xlsx,.xls,.pdf" hidden>
+                    <button class="btn btn-secondary" id="autoMapBtn">🤖 自動智慧對應</button>
+                    <button class="btn btn-secondary" id="loadMappingBtn">📂 載入對應規則</button>
+                    <button class="btn btn-secondary" id="saveMappingBtn">💾 儲存對應規則</button>
+                </div>
+                <div class="mapping-table-container">
+                    <table class="mapping-table" id="mappingTable">
+                        <thead>
+                            <tr>
+                                <th>撿貨單商品</th>
+                                <th>規格</th>
+                                <th>來源</th>
+                                <th>數量</th>
+                                <th>→</th>
+                                <th>報表商品</th>
+                                <th>欄位</th>
+                                <th>報表規格</th>
+                                <th>映射數量</th>
+                                <th>信心度</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mappingTableBody">
+                        </tbody>
+                    </table>
+                </div>
+                <button class="btn btn-primary" id="confirmMappingBtn">
+                    <span>✓ 確認對應並上傳生產統計表</span>
+                </button>
+                <input type="file" id="templateInput" accept=".xlsm,.xlsx" hidden>
+            </section>
+
+            <!-- Step 3: 預覽統計 -->
+            <section class="step-section hidden" id="step3">
+                <div class="step-header">
+                    <span class="step-number">步驟 3</span>
+                    <h2>預覽統計結果</h2>
+                </div>
+                <div class="stats-container" id="statsContainer">
+                    <!-- Statistics will be displayed here -->
+                </div>
+                <button class="btn btn-primary" id="generateReportBtn">
+                    <span>📊 產生報表</span>
+                </button>
+            </section>
+
+            <!-- Step 4: 下載報表 -->
+            <section class="step-section hidden" id="step4">
+                <div class="step-header">
+                    <span class="step-number">步驟 4</span>
+                    <h2>下載報表</h2>
+                </div>
+                <div class="download-area">
+                    <div class="success-message">
+                        <div class="success-icon">✓</div>
+                        <h3>報表已成功產生！</h3>
+                        <p>已將撿貨單數據填入生產統計表</p>
+                    </div>
+                    <button class="btn btn-success btn-large" id="downloadBtn">
+                        <span>💾 下載填入後的報表</span>
+                    </button>
+                    <button class="btn btn-secondary" id="resetBtn">
+                        <span>🔄 重新開始</span>
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>© 2024 IVY FOODIE PALACE - 撿貨單分析系統</p>
+        </footer>
+    </div>
+
+    <!-- Loading overlay -->
+    <div class="loading-overlay hidden" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <p class="loading-text" id="loadingText">處理中...</p>
+    </div>
+
+    <!-- Toast notification -->
+    <div class="toast hidden" id="toast"></div>
+
+    <script src="mapping-rules.js?v=3"></script>
+    <script src="app.js?v=28"></script>
+</body>
+
+</html>
