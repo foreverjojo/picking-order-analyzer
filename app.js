@@ -1241,11 +1241,13 @@ async function downloadReport() {
         // 設定 workbook.xml 強制開啟時重新計算公式
         const workbookPath = 'xl/workbook.xml';
         let workbookXml = await zip.file(workbookPath).async('string');
-        // 如果已有 calcPr，修改它；否則在 workbook 標籤後插入
+
+        // 檢查是否已有 calcPr 元素
         if (workbookXml.includes('<calcPr')) {
-            // 確保 fullCalcOnLoad="1"
-            workbookXml = workbookXml.replace(/<calcPr([^>]*)\/>/g, '<calcPr$1 fullCalcOnLoad="1"/>');
-            workbookXml = workbookXml.replace(/<calcPr([^>]*)>/g, '<calcPr$1 fullCalcOnLoad="1">');
+            // 如果已有 fullCalcOnLoad，先移除它
+            workbookXml = workbookXml.replace(/fullCalcOnLoad="[^"]*"/g, '');
+            // 在 calcPr 開頭加入 fullCalcOnLoad="1"
+            workbookXml = workbookXml.replace(/<calcPr\s*/g, '<calcPr fullCalcOnLoad="1" ');
         } else {
             // 在 </workbook> 前插入 calcPr
             workbookXml = workbookXml.replace('</workbook>', '<calcPr fullCalcOnLoad="1"/></workbook>');
