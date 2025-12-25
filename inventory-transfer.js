@@ -252,15 +252,29 @@ async function performTransfer() {
         if (!cellA) return;
 
         const sourceName = String(cellA).trim();
+
+        // 跳過標題行（含有「*庫存」的值）
+        const cellB = getCellValue(row.getCell(2));
+        if (cellB && String(cellB).includes('*庫存')) {
+            console.log(`跳過標題行 ${rowNumber}: ${sourceName}`);
+            return;
+        }
+
         const category = getProductCategory(sourceName);
+        console.log(`Row ${rowNumber}: "${sourceName}" -> 類別: ${category || '無'}`);
         if (!category) return;
 
         const mapping = categoryColumnMapping[category];
-        if (!mapping) return;
+        if (!mapping) {
+            console.log(`  無欄位映射規則: ${category}`);
+            return;
+        }
 
         // 找到今天報表中對應的產品名稱
         const targetName = productNameMapping[sourceName] || sourceName;
         const targetRow = todayProductRows.get(targetName);
+
+        console.log(`  映射: ${sourceName} -> ${targetName}, 目標行: ${targetRow || '未找到'}`);
 
         if (!targetRow) {
             console.log(`未找到匹配: ${sourceName} -> ${targetName}`);
