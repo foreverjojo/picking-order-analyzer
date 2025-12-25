@@ -426,7 +426,7 @@ async function downloadResult() {
 
         // 1. 已有值的儲存格
         const cellWithValuePattern = new RegExp(
-            `(<c r="${cellRef}"[^>]*)( t="[^"]*")?([^>]*>)(.*?)(<v>[^<]*</v>)(.*?)(</c>)`
+            `(<c r="${cellRef}"[^>]*?)( t="[^"]*")?([^>]*?>)(.*?)(<v>[^<]*</v>)(.*?)(</c>)`
         );
         if (sheetXml.match(cellWithValuePattern)) {
             // $1: <c r="G5" s="1"
@@ -439,7 +439,7 @@ async function downloadResult() {
         }
 
         // 2. 空儲存格：<c r="G5" .../>
-        const emptyCellPattern = new RegExp(`<c r="${cellRef}"([^/>]*)( t="[^"]*")?([^/>]*)/>`);
+        const emptyCellPattern = new RegExp(`<c r="${cellRef}"([^/>]*?)( t="[^"]*")?([^/>]*?)/>`);
         if (sheetXml.match(emptyCellPattern)) {
             // 移除可能存在的 t 屬性，並展開為 <c ...><v>...</v></c>
             sheetXml = sheetXml.replace(emptyCellPattern, `<c r="${cellRef}"$1$3><v>${value}</v></c>`);
@@ -448,7 +448,7 @@ async function downloadResult() {
         }
 
         // 3. 空內容儲存格：<c r="G5" ...></c>
-        const emptyContentCellPattern = new RegExp(`(<c r="${cellRef}"[^>]*)( t="[^"]*")?([^>]*>)(</c>)`);
+        const emptyContentCellPattern = new RegExp(`(<c r="${cellRef}"[^>]*?)( t="[^"]*")?([^>]*?>)(</c>)`);
         if (sheetXml.match(emptyContentCellPattern)) {
             sheetXml = sheetXml.replace(emptyContentCellPattern, `$1$3<v>${value}</v>$4`);
             console.log(`填入空內容儲存格 ${cellRef} 值為 ${value}`);
@@ -457,7 +457,7 @@ async function downloadResult() {
 
         // 4. 含公式的儲存格
         const formulaCellPattern = new RegExp(
-            `(<c r="${cellRef}"[^>]*)( t="[^"]*")?([^>]*>)(<f>[^<]*</f>)(<v>[^<]*</v>)?(</c>)`
+            `(<c r="${cellRef}"[^>]*?)( t="[^"]*")?([^>]*?>)(<f>[^<]*</f>)(<v>[^<]*</v>)?(</c>)`
         );
         if (sheetXml.match(formulaCellPattern)) {
             // 移除 t 屬性，並更新公式計算結果
