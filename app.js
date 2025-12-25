@@ -1154,38 +1154,63 @@ async function downloadReport() {
             const cellRef = update.cellRef;
             let matched = false;
 
-            // 1. 嘗試匹配已有值的儲存格：<c r="B5" s="1"><v>123</v></c>
-            // 只替換 <v>...</v> 部分，保留其他所有內容
-            const cellWithValuePattern = new RegExp(
-                `(<c r="${cellRef}"[^>]*>)(.*?)(<v>[^<]*</v>)(.*?)(</c>)`
-            );
-            const valueMatch = sheetXml.match(cellWithValuePattern);
-            if (valueMatch) {
-                sheetXml = sheetXml.replace(cellWithValuePattern, `$1$2<v>${update.value}</v>$4$5`);
-                console.log(`更新儲存格 ${cellRef} 的值為 ${update.value}`);
-                matched = true;
+            // 1. 嘗試匹配含公式和值的儲存格：<c r="B5" s="1"><f>...</f><v>123</v></c>
+            // 移除公式，只保留新值
+            if (!matched) {
+                const cellWithFormulaAndValuePattern = new RegExp(
+                    `(<c r="${cellRef}"[^>]*>)<f[^>]*>[\\s\\S]*?</f><v>[^<]*</v>(</c>)`
+                );
+                if (cellWithFormulaAndValuePattern.test(sheetXml)) {
+                    sheetXml = sheetXml.replace(cellWithFormulaAndValuePattern, `$1<v>${update.value}</v>$2`);
+                    console.log(`更新儲存格 ${cellRef}（移除公式）的值為 ${update.value}`);
+                    matched = true;
+                }
             }
 
-            // 2. 嘗試匹配空儲存格：<c r="B5" s="1"/>
+            // 2. 嘗試匹配只有公式的儲存格：<c r="B5" s="1"><f>...</f></c>
+            // 移除公式，插入新值
+            if (!matched) {
+                const cellWithOnlyFormulaPattern = new RegExp(
+                    `(<c r="${cellRef}"[^>]*>)<f[^>]*>[\\s\\S]*?</f>(</c>)`
+                );
+                if (cellWithOnlyFormulaPattern.test(sheetXml)) {
+                    sheetXml = sheetXml.replace(cellWithOnlyFormulaPattern, `$1<v>${update.value}</v>$2`);
+                    console.log(`更新儲存格 ${cellRef}（移除公式）的值為 ${update.value}`);
+                    matched = true;
+                }
+            }
+
+            // 3. 嘗試匹配已有值的儲存格：<c r="B5" s="1"><v>123</v></c>
+            // 只替換 <v>...</v> 部分
+            if (!matched) {
+                const cellWithValuePattern = new RegExp(
+                    `(<c r="${cellRef}"[^>]*>)<v>[^<]*</v>(</c>)`
+                );
+                if (cellWithValuePattern.test(sheetXml)) {
+                    sheetXml = sheetXml.replace(cellWithValuePattern, `$1<v>${update.value}</v>$2`);
+                    console.log(`更新儲存格 ${cellRef} 的值為 ${update.value}`);
+                    matched = true;
+                }
+            }
+
+            // 4. 嘗試匹配空儲存格：<c r="B5" s="1"/>
             if (!matched) {
                 const emptyCellPattern = new RegExp(
-                    `<c r="${cellRef}"([^/>]*)/>`, 'g'
+                    `<c r="${cellRef}"([^/>]*)/>`
                 );
-                const emptyMatch = sheetXml.match(emptyCellPattern);
-                if (emptyMatch) {
+                if (emptyCellPattern.test(sheetXml)) {
                     sheetXml = sheetXml.replace(emptyCellPattern, `<c r="${cellRef}"$1><v>${update.value}</v></c>`);
                     console.log(`填入空儲存格 ${cellRef} 值為 ${update.value}`);
                     matched = true;
                 }
             }
 
-            // 3. 嘗試匹配空內容儲存格：<c r="B5" s="1"></c>
+            // 5. 嘗試匹配空內容儲存格：<c r="B5" s="1"></c>
             if (!matched) {
                 const emptyContentCellPattern = new RegExp(
                     `(<c r="${cellRef}"[^>]*>)(</c>)`
                 );
-                const emptyContentMatch = sheetXml.match(emptyContentCellPattern);
-                if (emptyContentMatch) {
+                if (emptyContentCellPattern.test(sheetXml)) {
                     sheetXml = sheetXml.replace(emptyContentCellPattern, `$1<v>${update.value}</v>$2`);
                     console.log(`填入空內容儲存格 ${cellRef} 值為 ${update.value}`);
                     matched = true;
