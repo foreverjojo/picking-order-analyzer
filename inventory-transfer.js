@@ -246,6 +246,19 @@ async function performTransfer() {
 
     console.log('今天報表產品列表:', Array.from(todayProductRows.keys()));
 
+    // DEBUG: 輸出工作表 2 的前 50 行內容
+    console.log('=== 工作表 2 原始內容 ===');
+    for (let i = 1; i <= Math.min(50, sheet2.rowCount); i++) {
+        const row = sheet2.getRow(i);
+        const colA = getCellValue(row.getCell(1));
+        const colB = getCellValue(row.getCell(2));
+        const colC = getCellValue(row.getCell(3));
+        if (colA || colB || colC) {
+            console.log(`Row ${i}: A="${colA}", B="${colB}", C="${colC}"`);
+        }
+    }
+    console.log('=========================');
+
     // 遍歷昨天報表工作表 2 的每一行
     sheet2.eachRow((row, rowNumber) => {
         const cellA = row.getCell(1).value;
