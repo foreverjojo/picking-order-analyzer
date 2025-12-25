@@ -278,304 +278,305 @@ async function performTransfer() {
         if (colA || colB || colC) {
             console.log(`Row ${i}: A="${colA}", B="${colB}", C="${colC}"`);
         }
-        console.log('=========================');
+    }
+    console.log('=========================');
 
-        // 區段追蹤變數 - 用於處理無法單獨判斷類別的產品名稱
-        let currentSection = null;
+    // 區段追蹤變數 - 用於處理無法單獨判斷類別的產品名稱
+    let currentSection = null;
 
-        // 區段標題到類別的映射
-        const sectionHeaders = {
-            '杏仁瓦片': '瓦片類',
-            '瓦片類': '瓦片類',
-            '奶油餅乾': '奶油餅乾',
-            '西餅餅乾': '西餅餅乾',
-            '堅果類': '堅果類',
-            '椰棗類': '椰棗類',
-            '糖果': '糖果類',      // 注意：console 顯示的是 "糖果" 不是 "糖果類"
-            '糖果類': '糖果類'
-        };
+    // 區段標題到類別的映射
+    const sectionHeaders = {
+        '杏仁瓦片': '瓦片類',
+        '瓦片類': '瓦片類',
+        '奶油餅乾': '奶油餅乾',
+        '西餅餅乾': '西餅餅乾',
+        '堅果類': '堅果類',
+        '椰棗類': '椰棗類',
+        '糖果': '糖果類',      // 注意：console 顯示的是 "糖果" 不是 "糖果類"
+        '糖果類': '糖果類'
+    };
 
-        // 需要區段上下文才能判斷類別的產品名稱
-        const ambiguousNames = new Set([
-            '原味', '紅茶', '巧克力', '海苔', '抹茶', '黑糖', '青花椒',
-            '伯爵紅茶',  // 這個在奶油餅乾區段
-            '綜合堅果', '夏威夷豆', '腰果', '杏仁', '核桃',
-            '中東椰棗', '椰棗豆子', '椰棗腰果', '椰棗杏仁', '椰棗核桃',
-            '綜合瓦片'  // 瓦片區段的第一個產品
-        ]);
+    // 需要區段上下文才能判斷類別的產品名稱
+    const ambiguousNames = new Set([
+        '原味', '紅茶', '巧克力', '海苔', '抹茶', '黑糖', '青花椒',
+        '伯爵紅茶',  // 這個在奶油餅乾區段
+        '綜合堅果', '夏威夷豆', '腰果', '杏仁', '核桃',
+        '中東椰棗', '椰棗豆子', '椰棗腰果', '椰棗杏仁', '椰棗核桃',
+        '綜合瓦片'  // 瓦片區段的第一個產品
+    ]);
 
-        // 遍歷昨天報表工作表 2 的每一行
-        sheet2.eachRow((row, rowNumber) => {
-            const cellA = getCellValue(row.getCell(1));
-            if (!cellA) return;
+    // 遍歷昨天報表工作表 2 的每一行
+    sheet2.eachRow((row, rowNumber) => {
+        const cellA = getCellValue(row.getCell(1));
+        if (!cellA) return;
 
-            const sourceName = String(cellA).trim();
+        const sourceName = String(cellA).trim();
 
-            // 檢查是否為區段標題行
+        // 檢查是否為區段標題行
+        if (sectionHeaders[sourceName]) {
+            currentSection = sectionHeaders[sourceName];
+            console.log(`[區段切換] Row ${rowNumber}: 進入「${currentSection}」區段`);
+            // 區段標題本身不處理，繼續下一行
+            return;
+        }
+
+        // 跳過標題行（含有「*庫存」的值）
+        const cellB = getCellValue(row.getCell(2));
+        if (cellB && String(cellB).includes('*庫存')) {
+            console.log(`跳過標題行 ${rowNumber}: ${sourceName}`);
+            // 但仍然嘗試識別區段
             if (sectionHeaders[sourceName]) {
                 currentSection = sectionHeaders[sourceName];
-                console.log(`[區段切換] Row ${rowNumber}: 進入「${currentSection}」區段`);
-                // 區段標題本身不處理，繼續下一行
-                return;
             }
+            return;
+        }
 
-            // 跳過標題行（含有「*庫存」的值）
-            const cellB = getCellValue(row.getCell(2));
-            if (cellB && String(cellB).includes('*庫存')) {
-                console.log(`跳過標題行 ${rowNumber}: ${sourceName}`);
-                // 但仍然嘗試識別區段
-                if (sectionHeaders[sourceName]) {
-                    currentSection = sectionHeaders[sourceName];
-                }
-                return;
-            }
+        // 判斷類別：優先使用 getProductCategory，但如果是曖昧名稱則使用區段
+        let category = getProductCategory(sourceName);
 
-            // 判斷類別：優先使用 getProductCategory，但如果是曖昧名稱則使用區段
-            let category = getProductCategory(sourceName);
+        // 如果無法判斷類別，且該名稱在曖昧名稱列表中，使用當前區段
+        if (!category && ambiguousNames.has(sourceName) && currentSection) {
+            category = currentSection;
+            console.log(`Row ${rowNumber}: "${sourceName}" -> 使用區段推斷類別: ${category}`);
+        } else {
+            console.log(`Row ${rowNumber}: "${sourceName}" -> 類別: ${category || '無'}`);
+        }
 
-            // 如果無法判斷類別，且該名稱在曖昧名稱列表中，使用當前區段
-            if (!category && ambiguousNames.has(sourceName) && currentSection) {
-                category = currentSection;
-                console.log(`Row ${rowNumber}: "${sourceName}" -> 使用區段推斷類別: ${category}`);
-            } else {
-                console.log(`Row ${rowNumber}: "${sourceName}" -> 類別: ${category || '無'}`);
-            }
+        if (!category) return;
 
-            if (!category) return;
+        const mapping = categoryColumnMapping[category];
+        if (!mapping) {
+            console.log(`  無欄位映射規則: ${category}`);
+            return;
+        }
 
-            const mapping = categoryColumnMapping[category];
-            if (!mapping) {
-                console.log(`  無欄位映射規則: ${category}`);
-                return;
-            }
+        // 找到今天報表中對應的產品名稱
+        // 對於曖昧名稱，需要根據區段來決定正確的目標名稱
+        let targetName = productNameMapping[sourceName];
 
-            // 找到今天報表中對應的產品名稱
-            // 對於曖昧名稱，需要根據區段來決定正確的目標名稱
-            let targetName = productNameMapping[sourceName];
-
-            // 如果沒有直接映射，且是曖昧名稱，根據區段決定目標名稱
-            if (!targetName && ambiguousNames.has(sourceName)) {
-                if (category === '瓦片類') {
-                    targetName = '瓦片-' + sourceName;
-                } else if (category === '奶油餅乾') {
-                    targetName = '奶油-' + sourceName;
-                } else if (category === '堅果類') {
-                    targetName = '無調味' + sourceName;
-                } else if (category === '椰棗類') {
-                    // 椰棗類產品映射到今日報表格式
-                    if (sourceName === '中東椰棗') {
-                        targetName = '★中東椰棗300g';
-                    } else {
-                        targetName = sourceName + '150g';
-                    }
+        // 如果沒有直接映射，且是曖昧名稱，根據區段決定目標名稱
+        if (!targetName && ambiguousNames.has(sourceName)) {
+            if (category === '瓦片類') {
+                targetName = '瓦片-' + sourceName;
+            } else if (category === '奶油餅乾') {
+                targetName = '奶油-' + sourceName;
+            } else if (category === '堅果類') {
+                targetName = '無調味' + sourceName;
+            } else if (category === '椰棗類') {
+                // 椰棗類產品映射到今日報表格式
+                if (sourceName === '中東椰棗') {
+                    targetName = '★中東椰棗300g';
                 } else {
-                    targetName = sourceName;
+                    targetName = sourceName + '150g';
                 }
-            } else if (!targetName) {
+            } else {
                 targetName = sourceName;
             }
+        } else if (!targetName) {
+            targetName = sourceName;
+        }
 
-            const targetRow = todayProductRows.get(targetName);
+        const targetRow = todayProductRows.get(targetName);
 
-            console.log(`  映射: ${sourceName} -> ${targetName}, 目標行: ${targetRow || '未找到'}`);
+        console.log(`  映射: ${sourceName} -> ${targetName}, 目標行: ${targetRow || '未找到'}`);
 
-            if (!targetRow) {
-                console.log(`未找到匹配: ${sourceName} -> ${targetName}`);
-                return;
+        if (!targetRow) {
+            console.log(`未找到匹配: ${sourceName} -> ${targetName}`);
+            return;
+        }
+
+        // 根據類別處理欄位映射
+        if (mapping.sourceCol) {
+            // 單一欄位映射
+            const sourceValue = getCellValue(row.getCell(colLetterToNumber(mapping.sourceCol)));
+            if (sourceValue !== null && sourceValue !== undefined) {
+                const targetColNum = colLetterToNumber(mapping.targetCol);
+                sheet1.getRow(targetRow).getCell(targetColNum).value = sourceValue;
+
+                transferResults.push({
+                    sourceName,
+                    targetName,
+                    targetRow,
+                    targetCol: mapping.targetCol,
+                    value: sourceValue,
+                    matched: true
+                });
+            }
+        } else {
+            // 大小包雙欄位映射
+            const smallValue = getCellValue(row.getCell(colLetterToNumber(mapping.sourceSmall)));
+            const largeValue = getCellValue(row.getCell(colLetterToNumber(mapping.sourceLarge)));
+
+            if (smallValue !== null && smallValue !== undefined) {
+                const targetColNum = colLetterToNumber(mapping.targetSmall);
+                sheet1.getRow(targetRow).getCell(targetColNum).value = smallValue;
+
+                transferResults.push({
+                    sourceName,
+                    targetName,
+                    targetRow,
+                    targetCol: mapping.targetSmall,
+                    value: smallValue,
+                    type: '小包',
+                    matched: true
+                });
             }
 
-            // 根據類別處理欄位映射
-            if (mapping.sourceCol) {
-                // 單一欄位映射
-                const sourceValue = getCellValue(row.getCell(colLetterToNumber(mapping.sourceCol)));
-                if (sourceValue !== null && sourceValue !== undefined) {
-                    const targetColNum = colLetterToNumber(mapping.targetCol);
-                    sheet1.getRow(targetRow).getCell(targetColNum).value = sourceValue;
+            if (largeValue !== null && largeValue !== undefined) {
+                const targetColNum = colLetterToNumber(mapping.targetLarge);
+                sheet1.getRow(targetRow).getCell(targetColNum).value = largeValue;
 
-                    transferResults.push({
-                        sourceName,
-                        targetName,
-                        targetRow,
-                        targetCol: mapping.targetCol,
-                        value: sourceValue,
-                        matched: true
-                    });
-                }
-            } else {
-                // 大小包雙欄位映射
-                const smallValue = getCellValue(row.getCell(colLetterToNumber(mapping.sourceSmall)));
-                const largeValue = getCellValue(row.getCell(colLetterToNumber(mapping.sourceLarge)));
-
-                if (smallValue !== null && smallValue !== undefined) {
-                    const targetColNum = colLetterToNumber(mapping.targetSmall);
-                    sheet1.getRow(targetRow).getCell(targetColNum).value = smallValue;
-
-                    transferResults.push({
-                        sourceName,
-                        targetName,
-                        targetRow,
-                        targetCol: mapping.targetSmall,
-                        value: smallValue,
-                        type: '小包',
-                        matched: true
-                    });
-                }
-
-                if (largeValue !== null && largeValue !== undefined) {
-                    const targetColNum = colLetterToNumber(mapping.targetLarge);
-                    sheet1.getRow(targetRow).getCell(targetColNum).value = largeValue;
-
-                    transferResults.push({
-                        sourceName,
-                        targetName,
-                        targetRow,
-                        targetCol: mapping.targetLarge,
-                        value: largeValue,
-                        type: '大包',
-                        matched: true
-                    });
-                }
+                transferResults.push({
+                    sourceName,
+                    targetName,
+                    targetRow,
+                    targetCol: mapping.targetLarge,
+                    value: largeValue,
+                    type: '大包',
+                    matched: true
+                });
             }
-        });
+        }
+    });
 
-        // 顯示結果
-        showResults();
-    }
+    // 顯示結果
+    showResults();
+}
 
-    function showResults() {
-        const resultCard = document.getElementById('resultCard');
-        resultCard.style.display = 'block';
+function showResults() {
+    const resultCard = document.getElementById('resultCard');
+    resultCard.style.display = 'block';
 
-        const matched = transferResults.filter(r => r.matched).length;
-        document.getElementById('totalMatched').textContent = matched;
-        document.getElementById('totalUnmatched').textContent = 0;
+    const matched = transferResults.filter(r => r.matched).length;
+    document.getElementById('totalMatched').textContent = matched;
+    document.getElementById('totalUnmatched').textContent = 0;
 
-        // 建立預覽表格
-        let html = '<table class="preview-table">';
-        html += '<tr><th>來源產品</th><th>目標產品</th><th>目標儲存格</th><th>庫存值</th></tr>';
+    // 建立預覽表格
+    let html = '<table class="preview-table">';
+    html += '<tr><th>來源產品</th><th>目標產品</th><th>目標儲存格</th><th>庫存值</th></tr>';
 
-        transferResults.forEach(result => {
-            const typeLabel = result.type ? ` (${result.type})` : '';
-            html += `<tr>
+    transferResults.forEach(result => {
+        const typeLabel = result.type ? ` (${result.type})` : '';
+        html += `<tr>
             <td>${result.sourceName}${typeLabel}</td>
             <td class="match-success">${result.targetName}</td>
             <td>${result.targetCol}${result.targetRow}</td>
             <td>${result.value}</td>
         </tr>`;
-        });
+    });
 
-        html += '</table>';
-        document.getElementById('previewContainer').innerHTML = html;
+    html += '</table>';
+    document.getElementById('previewContainer').innerHTML = html;
 
-        console.log('轉移完成，共 ' + matched + ' 項');
-    }
+    console.log('轉移完成，共 ' + matched + ' 項');
+}
 
-    async function downloadResult() {
-        try {
-            // 使用 JSZip 直接修改 XML，保留 .xlsm 格式和巨集
-            const zip = await JSZip.loadAsync(todayFileBuffer);
+async function downloadResult() {
+    try {
+        // 使用 JSZip 直接修改 XML，保留 .xlsm 格式和巨集
+        const zip = await JSZip.loadAsync(todayFileBuffer);
 
-            // 讀取 sheet1.xml
-            // 注意：這裡假設第一個工作表總是 sheet1.xml。這在大多數情況下是正確的。
-            const sheetPath = 'xl/worksheets/sheet1.xml';
-            if (!zip.file(sheetPath)) {
-                alert('錯誤：找不到 sheet1.xml，無法寫入數據。請確認範本格式。');
+        // 讀取 sheet1.xml
+        // 注意：這裡假設第一個工作表總是 sheet1.xml。這在大多數情況下是正確的。
+        const sheetPath = 'xl/worksheets/sheet1.xml';
+        if (!zip.file(sheetPath)) {
+            alert('錯誤：找不到 sheet1.xml，無法寫入數據。請確認範本格式。');
+            return;
+        }
+
+        let sheetXml = await zip.file(sheetPath).async('string');
+
+        // 將 transferResults 中的數據寫入 XML
+        let updatedCount = 0;
+
+        transferResults.forEach(result => {
+            const cellRef = result.targetCol + result.targetRow;
+            const value = result.value;
+
+            if (value === null || value === undefined) return;
+
+            // --- 手術刀式字串替換策略 ---
+            // 直接在字串中定位 <c ... r="CELL_REF" ...>，準確找出標籤範圍並替換
+
+            // 1. 定位 r="CELL_REF"
+            const refStr = `r="${cellRef}"`;
+            const refIdx = sheetXml.indexOf(refStr);
+
+            if (refIdx === -1) {
+                console.log(`[XML] 找不到儲存格 ${cellRef} (可能該行無此欄位)`);
                 return;
             }
 
-            let sheetXml = await zip.file(sheetPath).async('string');
+            // 2. 往回找標籤開頭 <c
+            const tagStart = sheetXml.lastIndexOf('<c', refIdx);
+            if (tagStart === -1) {
+                console.error(`[XML] 異常: 找到 ${refStr} 但找不到開頭 <c`);
+                return;
+            }
 
-            // 將 transferResults 中的數據寫入 XML
-            let updatedCount = 0;
+            // 3. 判斷標籤結束位置
+            const tagInnerEnd = sheetXml.indexOf('>', tagStart);
+            if (tagInnerEnd === -1) return;
 
-            transferResults.forEach(result => {
-                const cellRef = result.targetCol + result.targetRow;
-                const value = result.value;
+            let tagEnd = -1;
 
-                if (value === null || value === undefined) return;
-
-                // --- 手術刀式字串替換策略 ---
-                // 直接在字串中定位 <c ... r="CELL_REF" ...>，準確找出標籤範圍並替換
-
-                // 1. 定位 r="CELL_REF"
-                const refStr = `r="${cellRef}"`;
-                const refIdx = sheetXml.indexOf(refStr);
-
-                if (refIdx === -1) {
-                    console.log(`[XML] 找不到儲存格 ${cellRef} (可能該行無此欄位)`);
-                    return;
-                }
-
-                // 2. 往回找標籤開頭 <c
-                const tagStart = sheetXml.lastIndexOf('<c', refIdx);
-                if (tagStart === -1) {
-                    console.error(`[XML] 異常: 找到 ${refStr} 但找不到開頭 <c`);
-                    return;
-                }
-
-                // 3. 判斷標籤結束位置
-                const tagInnerEnd = sheetXml.indexOf('>', tagStart);
-                if (tagInnerEnd === -1) return;
-
-                let tagEnd = -1;
-
-                // 檢查是否為 self-closing (/>)
-                if (sheetXml[tagInnerEnd - 1] === '/') {
-                    // <c r="G5" ... />
-                    tagEnd = tagInnerEnd + 1;
+            // 檢查是否為 self-closing (/>)
+            if (sheetXml[tagInnerEnd - 1] === '/') {
+                // <c r="G5" ... />
+                tagEnd = tagInnerEnd + 1;
+            } else {
+                // <c r="G5" ...>...</c>
+                const closeTag = '</c>';
+                const closeTagIdx = sheetXml.indexOf(closeTag, tagInnerEnd);
+                if (closeTagIdx !== -1) {
+                    tagEnd = closeTagIdx + closeTag.length;
                 } else {
-                    // <c r="G5" ...>...</c>
-                    const closeTag = '</c>';
-                    const closeTagIdx = sheetXml.indexOf(closeTag, tagInnerEnd);
-                    if (closeTagIdx !== -1) {
-                        tagEnd = closeTagIdx + closeTag.length;
-                    } else {
-                        console.error(`[XML] 異常: 儲存格 ${cellRef} 是展開的但找不到 </c>`);
-                        return;
-                    }
+                    console.error(`[XML] 異常: 儲存格 ${cellRef} 是展開的但找不到 </c>`);
+                    return;
                 }
+            }
 
-                const originalTag = sheetXml.substring(tagStart, tagEnd);
+            const originalTag = sheetXml.substring(tagStart, tagEnd);
 
-                // 4. 解析原有 Style (s="...")
-                const styleMatch = originalTag.match(/ s="([0-9]+)"/);
-                const styleAttr = styleMatch ? ` s="${styleMatch[1]}"` : '';
+            // 4. 解析原有 Style (s="...")
+            const styleMatch = originalTag.match(/ s="([0-9]+)"/);
+            const styleAttr = styleMatch ? ` s="${styleMatch[1]}"` : '';
 
-                // 5. 構建新標籤
-                // 始終展開為標準格式: <c r="..." s="..."> <v>...</v> </c>
-                // 這會自動移除 t="s" (如有)，將其變為預設數值型態
-                const newTag = `<c r="${cellRef}"${styleAttr}><v>${value}</v></c>`;
+            // 5. 構建新標籤
+            // 始終展開為標準格式: <c r="..." s="..."> <v>...</v> </c>
+            // 這會自動移除 t="s" (如有)，將其變為預設數值型態
+            const newTag = `<c r="${cellRef}"${styleAttr}><v>${value}</v></c>`;
 
-                // 6. 執行字串替換
-                sheetXml = sheetXml.substring(0, tagStart) + newTag + sheetXml.substring(tagEnd);
+            // 6. 執行字串替換
+            sheetXml = sheetXml.substring(0, tagStart) + newTag + sheetXml.substring(tagEnd);
 
-                updatedCount++;
-                console.log(`[XML] 更新 ${cellRef}`);
-            });
+            updatedCount++;
+            console.log(`[XML] 更新 ${cellRef}`);
+        });
 
-            console.log(`XML 更新完成，共修改 ${updatedCount} 個儲存格`);
+        console.log(`XML 更新完成，共修改 ${updatedCount} 個儲存格`);
 
-            // 寫回 ZIP
-            zip.file(sheetPath, sheetXml);
+        // 寫回 ZIP
+        zip.file(sheetPath, sheetXml);
 
-            // --- 修正策略：不移除 calcChain 或修改 _rels ---
-            // 之前的嘗試顯示修改 _rels/workbook.xml.rels 可能導致 Excel 找不到其他工作表 (如 Sheet 3 消失)
-            // 由於我們只修改了 Sheet 1 的儲存格數值 (且移除了 shared string 依賴)，
-            // Excel 應該能自動偵測並在開啟時重新計算，頂多跳出輕微的修復警告，而不會掉資料。
-            // 這是目前最安全的做法。
+        // --- 修正策略：不移除 calcChain 或修改 _rels ---
+        // 之前的嘗試顯示修改 _rels/workbook.xml.rels 可能導致 Excel 找不到其他工作表 (如 Sheet 3 消失)
+        // 由於我們只修改了 Sheet 1 的儲存格數值 (且移除了 shared string 依賴)，
+        // Excel 應該能自動偵測並在開啟時重新計算，頂多跳出輕微的修復警告，而不會掉資料。
+        // 這是目前最安全的做法。
 
-            // 生成檔案
-            const content = await zip.generateAsync({ type: 'blob' });
-            const url = URL.createObjectURL(content);
-            const a = document.createElement('a');
-            a.href = url;
-            const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
-            a.download = `生產統計表_庫存已轉移_${today}.xlsm`;
-            a.click();
-            URL.revokeObjectURL(url);
+        // 生成檔案
+        const content = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(content);
+        const a = document.createElement('a');
+        a.href = url;
+        const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+        a.download = `生產統計表_庫存已轉移_${today}.xlsm`;
+        a.click();
+        URL.revokeObjectURL(url);
 
-        } catch (error) {
-            console.error('產生檔案時發生錯誤:', error);
-            alert('產生檔案時發生錯誤，請查看 Console');
-        }
+    } catch (error) {
+        console.error('產生檔案時發生錯誤:', error);
+        alert('產生檔案時發生錯誤，請查看 Console');
     }
+}
