@@ -476,7 +476,24 @@ async function downloadResult() {
 
         // 序列化回 XML 字串
         const serializer = new XMLSerializer();
-        const newSheetXml = serializer.serializeToString(xmlDoc);
+        let newSheetXml = serializer.serializeToString(xmlDoc);
+
+        // --- 修正: 移除 XMLSerializer 自動加入的冗餘 xmlns 屬性 ---
+        // DOMParser/XMLSerializer 為了嚴謹，常會在每個子元素補上 xmlns，這會導致 Excel 檔案大小暴增甚至報錯
+        // 我們將其移除，只保留 root 的 xmlns
+        const targetNs = ' xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
+
+        // 1. 先把所有的 namespace 宣告移除
+        newSheetXml = newSheetXml.split(targetNs).join('');
+
+        // 2. 確保 root <worksheet> 標籤有正確的 namespace
+        // 原本 root 可能長這樣 <worksheet xmlns="..." ...> 或 <worksheet ...>
+        // 因為上面全移除了，這裡要補回去。通常 <worksheet> 是第一個標籤
+        if (!newSheetXml.includes(targetNs)) {
+            newSheetXml = newSheetXml.replace('<worksheet', `<worksheet${targetNs}`);
+        }
+
+        console.log('XML Namespace 清理完成');
 
         // 寫回 ZIP
         zip.file(sheetPath, newSheetXml);
