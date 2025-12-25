@@ -182,9 +182,13 @@ async function handleTodayFile(e) {
     document.getElementById('todayFileName').textContent = file.name;
     document.getElementById('todayBox').classList.add('has-file');
 
-    todayFileBuffer = await file.arrayBuffer();
+    // 儲存原始檔案的完整副本（用於 JSZip 輸出）
+    const arrayBuffer = await file.arrayBuffer();
+    todayFileBuffer = new Uint8Array(arrayBuffer);
+
+    // 讀取給 ExcelJS 使用（需要另一個副本，因為 ExcelJS 可能會修改 buffer）
     todayWorkbook = new ExcelJS.Workbook();
-    await todayWorkbook.xlsx.load(todayFileBuffer);
+    await todayWorkbook.xlsx.load(arrayBuffer.slice(0));
 
     console.log('今天報表已載入:', todayWorkbook.worksheets.map(ws => ws.name));
     checkReadyToTransfer();
