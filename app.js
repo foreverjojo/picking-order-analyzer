@@ -1218,17 +1218,8 @@ async function downloadReport() {
             console.log('已從 Content_Types.xml 移除 calcChain 引用');
         }
 
-        // 清除所有公式儲存格的緩存值，強制 Excel 重新計算
-        // 重新讀取 sheetXml（因為上面已經修改過）
-        sheetXml = await zip.file(sheetPath).async('string');
-        // 移除公式儲存格中的 <v>...</v> 緩存值
-        // 匹配 <c ...><f>公式</f><v>緩存值</v></c>，移除 <v>...</v> 部分
-        const formulaCachePattern = /(<c[^>]*><f[^>]*>[^<]*<\/f>)<v>[^<]*<\/v>(<\/c>)/g;
-        const cleanedSheetXml = sheetXml.replace(formulaCachePattern, '$1$2');
-        if (cleanedSheetXml !== sheetXml) {
-            zip.file(sheetPath, cleanedSheetXml);
-            console.log('已清除公式緩存值，Excel 將重新計算');
-        }
+        // 注意：不再清除公式緩存值，因為正則表達式無法正確處理複雜公式
+        // 刪除 calcChain.xml 已經足夠強制 Excel 重新計算公式
 
         // 生成最終文件
         const content = await zip.generateAsync({
