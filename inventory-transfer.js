@@ -193,6 +193,28 @@ function colLetterToNumber(letter) {
     return letter.charCodeAt(0) - 64;
 }
 
+// 處理公式儲存格，提取實際數值
+function getCellValue(cell) {
+    const value = cell.value;
+    if (value === null || value === undefined) return null;
+
+    // 如果是物件（公式儲存格），提取 result
+    if (typeof value === 'object') {
+        // ExcelJS 公式儲存格格式: { formula: '...', result: 123 }
+        if (value.result !== undefined) {
+            return value.result;
+        }
+        // 富文本格式: { richText: [...] }
+        if (value.richText) {
+            return value.richText.map(r => r.text).join('');
+        }
+        // 其他物件類型，嘗試轉換
+        return null;
+    }
+
+    return value;
+}
+
 async function performTransfer() {
     transferResults = [];
 
@@ -246,7 +268,7 @@ async function performTransfer() {
         // 根據類別處理欄位映射
         if (mapping.sourceCol) {
             // 單一欄位映射
-            const sourceValue = row.getCell(colLetterToNumber(mapping.sourceCol)).value;
+            const sourceValue = getCellValue(row.getCell(colLetterToNumber(mapping.sourceCol)));
             if (sourceValue !== null && sourceValue !== undefined) {
                 const targetColNum = colLetterToNumber(mapping.targetCol);
                 sheet1.getRow(targetRow).getCell(targetColNum).value = sourceValue;
@@ -262,8 +284,8 @@ async function performTransfer() {
             }
         } else {
             // 大小包雙欄位映射
-            const smallValue = row.getCell(colLetterToNumber(mapping.sourceSmall)).value;
-            const largeValue = row.getCell(colLetterToNumber(mapping.sourceLarge)).value;
+            const smallValue = getCellValue(row.getCell(colLetterToNumber(mapping.sourceSmall)));
+            const largeValue = getCellValue(row.getCell(colLetterToNumber(mapping.sourceLarge)));
 
             if (smallValue !== null && smallValue !== undefined) {
                 const targetColNum = colLetterToNumber(mapping.targetSmall);
