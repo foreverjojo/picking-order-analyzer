@@ -1156,7 +1156,7 @@ async function downloadReport() {
             // 1. 嘗試匹配已有值的儲存格：<c r="B5" s="1"><v>123</v></c>
             // 只替換 <v>...</v> 部分，保留其他所有內容
             const cellWithValuePattern = new RegExp(
-                `(<c r="${cellRef}"[^>]*>)(<v>[^<]*</v>)(</c>)`, 'g'
+                `(<c r="${cellRef}"[^>]*>)(<v>[^<]*</v>)(</c>)`
             );
 
             if (cellWithValuePattern.test(sheetXml)) {
@@ -1168,7 +1168,7 @@ async function downloadReport() {
             // 2. 嘗試匹配有公式的儲存格：<c r="B5" s="1"><f>...</f><v>123</v></c>
             // 移除公式，設定新值
             const cellWithFormulaPattern = new RegExp(
-                `(<c r="${cellRef}"[^>]*>)(<f>[^<]*</f>)?(<v>[^<]*</v>)?(</c>)`, 'g'
+                `(<c r="${cellRef}"[^>]*>)(<f>[^<]*</f>)?(<v>[^<]*</v>)?(</c>)`
             );
 
             if (cellWithFormulaPattern.test(sheetXml)) {
