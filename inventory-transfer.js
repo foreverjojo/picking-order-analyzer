@@ -415,6 +415,42 @@ async function performTransfer() {
         }
     });
 
+    // === 工作表 2 到工作表 2 的直接欄位映射 ===
+    // 昨天工作表 2 的 C 欄 -> 今天工作表 2 的 B 欄 (同一行號)
+    const todaySheet2 = todayWorkbook.worksheets[1];
+    if (todaySheet2) {
+        const sheet2DirectMappings = [
+            37, 38, 39, 40, 41,  // 椰棗類
+            43, 44,              // 糖果類
+            48, 49, 50, 51, 52, 53, 54,  // 瓦片類
+            57, 58, 59, 60, 61,  // 奶油餅乾
+            64, 65, 66, 67, 68   // 西餅餅乾
+        ];
+
+        console.log('=== 工作表 2 直接欄位映射 ===');
+        sheet2DirectMappings.forEach(rowNum => {
+            const sourceValue = getCellValue(sheet2.getRow(rowNum).getCell(3)); // C 欄 = 第 3 欄
+            if (sourceValue !== null && sourceValue !== undefined) {
+                todaySheet2.getRow(rowNum).getCell(2).value = sourceValue; // B 欄 = 第 2 欄
+
+                transferResults.push({
+                    sourceName: `工作表2 C${rowNum}`,
+                    targetName: `工作表2 B${rowNum}`,
+                    targetRow: rowNum,
+                    targetCol: 'B',
+                    value: sourceValue,
+                    type: '直接映射',
+                    matched: true
+                });
+
+                console.log(`[工作表2] C${rowNum} -> B${rowNum}: ${sourceValue}`);
+            }
+        });
+        console.log('=========================');
+    } else {
+        console.log('今天報表沒有工作表 2，跳過直接映射');
+    }
+
     // 顯示結果
     showResults();
 }
@@ -530,10 +566,66 @@ async function downloadResult() {
             console.log(`[XML] 更新 ${cellRef}`);
         });
 
-        console.log(`XML 更新完成，共修改 ${updatedCount} 個儲存格`);
+        console.log(`XML 更新完成，共修改 ${updatedCount} 個儲存格 (工作表1)`);
 
         // 寫回 ZIP
         zip.file(sheetPath, sheetXml);
+
+        // === 處理工作表 2 ===
+        const sheet2Path = 'xl/worksheets/sheet2.xml';
+        if (zip.file(sheet2Path)) {
+            let sheet2Xml = await zip.file(sheet2Path).async('string');
+            let sheet2UpdatedCount = 0;
+
+            // 篩選出工作表 2 的結果（type 為 '直接映射' 的項目）
+            const sheet2Results = transferResults.filter(r => r.type === '直接映射');
+
+            sheet2Results.forEach(result => {
+                const cellRef = result.targetCol + result.targetRow;
+                const value = result.value;
+
+                if (value === null || value === undefined) return;
+
+                // 使用相同的手術刀式字串替換策略
+                const refStr = `r="${cellRef}"`;
+                const refIdx = sheet2Xml.indexOf(refStr);
+
+                if (refIdx === -1) {
+                    console.log(`[工作表2 XML] 找不到儲存格 ${cellRef}`);
+                    return;
+                }
+
+                const tagStart = sheet2Xml.lastIndexOf('<c', refIdx);
+                if (tagStart === -1) return;
+
+                const tagInnerEnd = sheet2Xml.indexOf('>', tagStart);
+                if (tagInnerEnd === -1) return;
+
+                let tagEnd = -1;
+                if (sheet2Xml[tagInnerEnd - 1] === '/') {
+                    tagEnd = tagInnerEnd + 1;
+                } else {
+                    const closeTagIdx = sheet2Xml.indexOf('</c>', tagInnerEnd);
+                    if (closeTagIdx !== -1) {
+                        tagEnd = closeTagIdx + 4;
+                    } else {
+                        return;
+                    }
+                }
+
+                const originalTag = sheet2Xml.substring(tagStart, tagEnd);
+                const styleMatch = originalTag.match(/ s="([0-9]+)"/);
+                const styleAttr = styleMatch ? ` s="${styleMatch[1]}"` : '';
+                const newTag = `<c r="${cellRef}"${styleAttr}><v>${value}</v></c>`;
+
+                sheet2Xml = sheet2Xml.substring(0, tagStart) + newTag + sheet2Xml.substring(tagEnd);
+                sheet2UpdatedCount++;
+                console.log(`[工作表2 XML] 更新 ${cellRef}`);
+            });
+
+            console.log(`XML 更新完成，共修改 ${sheet2UpdatedCount} 個儲存格 (工作表2)`);
+            zip.file(sheet2Path, sheet2Xml);
+        }
 
         // --- 修正策略：不移除 calcChain 或修改 _rels ---
         // 之前的嘗試顯示修改 _rels/workbook.xml.rels 可能導致 Excel 找不到其他工作表 (如 Sheet 3 消失)
