@@ -1238,6 +1238,21 @@ async function downloadReport() {
             console.log('已從 Content_Types.xml 移除 calcChain 引用');
         }
 
+        // 設定 workbook.xml 強制開啟時重新計算公式
+        const workbookPath = 'xl/workbook.xml';
+        let workbookXml = await zip.file(workbookPath).async('string');
+        // 如果已有 calcPr，修改它；否則在 workbook 標籤後插入
+        if (workbookXml.includes('<calcPr')) {
+            // 確保 fullCalcOnLoad="1"
+            workbookXml = workbookXml.replace(/<calcPr([^>]*)\/>/g, '<calcPr$1 fullCalcOnLoad="1"/>');
+            workbookXml = workbookXml.replace(/<calcPr([^>]*)>/g, '<calcPr$1 fullCalcOnLoad="1">');
+        } else {
+            // 在 </workbook> 前插入 calcPr
+            workbookXml = workbookXml.replace('</workbook>', '<calcPr fullCalcOnLoad="1"/></workbook>');
+        }
+        zip.file(workbookPath, workbookXml);
+        console.log('已設定公式在開啟時自動重新計算');
+
         // 注意：不再清除公式緩存值，因為正則表達式無法正確處理複雜公式
         // 刪除 calcChain.xml 已經足夠強制 Excel 重新計算公式
 
