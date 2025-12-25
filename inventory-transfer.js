@@ -385,10 +385,90 @@ function showResults() {
 }
 
 async function downloadResult() {
-    const buffer = await todayWorkbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    // 使用 JSZip 直接修改 XML，保留 .xlsm 格式和巨集
+    const zip = await JSZip.loadAsync(todayFileBuffer);
 
-    const url = URL.createObjectURL(blob);
+    // 讀取 sheet1.xml
+    const sheetPath = 'xl/worksheets/sheet1.xml';
+    let sheetXml = await zip.file(sheetPath).async('string');
+
+    // 將 transferResults 中的數據寫入 XML
+    transferResults.forEach(result => {
+        const cellRef = result.targetCol + result.targetRow;
+        const value = result.value;
+
+        // 嘗試多種儲存格格式進行替換
+        // 1. 已有值的儲存格：<c r="G5" ...><v>123</v></c>
+        const cellWithValuePattern = new RegExp(
+            `(<c r="${cellRef}"[^>]*>)(.*?)(<v>[^<]*</v>)(.*?)(</c>)`
+        );
+        if (sheetXml.match(cellWithValuePattern)) {
+            sheetXml = sheetXml.replace(cellWithValuePattern, `$1$2<v>${value}</v>$4$5`);
+            console.log(`更新儲存格 ${cellRef} 的值為 ${value}`);
+            return;
+        }
+
+        // 2. 空儲存格：<c r="G5" .../>
+        const emptyCellPattern = new RegExp(`<c r="${cellRef}"([^/>]*)/>`);
+        if (sheetXml.match(emptyCellPattern)) {
+            sheetXml = sheetXml.replace(emptyCellPattern, `<c r="${cellRef}"$1><v>${value}</v></c>`);
+            console.log(`填入空儲存格 ${cellRef} 值為 ${value}`);
+            return;
+        }
+
+        // 3. 空內容儲存格：<c r="G5" ...></c>
+        const emptyContentCellPattern = new RegExp(`(<c r="${cellRef}"[^>]*>)(</c>)`);
+        if (sheetXml.match(emptyContentCellPattern)) {
+            sheetXml = sheetXml.replace(emptyContentCellPattern, `$1<v>${value}</v>$2`);
+            console.log(`填入空內容儲存格 ${cellRef} 值為 ${value}`);
+            return;
+        }
+
+        // 4. 含公式的儲存格：<c r="G5" ...><f>...</f></c> 或 <c r="G5" ...><f>...</f><v>...</v></c>
+        const formulaCellPattern = new RegExp(
+            `(<c r="${cellRef}"[^>]*>)(<f>[^<]*</f>)(<v>[^<]*</v>)?(</c>)`
+        );
+        if (sheetXml.match(formulaCellPattern)) {
+            sheetXml = sheetXml.replace(formulaCellPattern, `$1$2<v>${value}</v>$4`);
+            console.log(`更新公式儲存格 ${cellRef} 的值為 ${value}`);
+            return;
+        }
+
+        console.log(`儲存格 ${cellRef} 在 XML 中未找到匹配模式`);
+    });
+
+    // 寫回 ZIP
+    zip.file(sheetPath, sheetXml);
+
+    // 刪除 calcChain.xml 強制 Excel 重新計算公式
+    if (zip.file('xl/calcChain.xml')) {
+        zip.remove('xl/calcChain.xml');
+
+        // 從 [Content_Types].xml 中移除對 calcChain 的引用
+        const contentTypesPath = '[Content_Types].xml';
+        let contentTypesXml = await zip.file(contentTypesPath).async('string');
+        contentTypesXml = contentTypesXml.replace(/<Override[^>]*calcChain[^>]*\/>/g, '');
+        zip.file(contentTypesPath, contentTypesXml);
+    }
+
+    // 設定 fullCalcOnLoad 強制重新計算
+    const workbookPath = 'xl/workbook.xml';
+    let workbookXml = await zip.file(workbookPath).async('string');
+    if (!workbookXml.includes('fullCalcOnLoad')) {
+        workbookXml = workbookXml.replace(
+            /<calcPr([^>]*)\/>/,
+            '<calcPr$1 fullCalcOnLoad="1"/>'
+        );
+        workbookXml = workbookXml.replace(
+            /<calcPr([^>]*)>/,
+            '<calcPr$1 fullCalcOnLoad="1">'
+        );
+        zip.file(workbookPath, workbookXml);
+    }
+
+    // 生成檔案
+    const content = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(content);
     const a = document.createElement('a');
     a.href = url;
     const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
