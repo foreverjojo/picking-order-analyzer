@@ -404,146 +404,47 @@ function showResults() {
 
 async function downloadResult() {
     try {
-        // 使用 JSZip 直接修改 XML，保留 .xlsm 格式和巨集
-        const zip = await JSZip.loadAsync(todayFileBuffer);
+        if (!todayWorkbook) {
+            alert('請先上傳今天報表');
+            return;
+        }
 
-        // 讀取 sheet1.xml
-        const sheetPath = 'xl/worksheets/sheet1.xml';
-        let sheetXml = await zip.file(sheetPath).async('string');
+        console.log('開始使用 ExcelJS 生成檔案...');
 
-        // 將 transferResults 中的數據寫入 XML
+        // 讀取今天報表的工作表 1
+        const sheet = todayWorkbook.worksheets[0];
+
         let updatedCount = 0;
-
         transferResults.forEach(result => {
-            const cellRef = result.targetCol + result.targetRow;
-            const value = result.value;
+            if (result.value === null || result.value === undefined) return;
 
-            if (value === null || value === undefined) return;
+            // ExcelJS 使用 1-based index，但我們已經有 targetRow (1-based) 和 targetCol (letter)
+            // sheet.getRow(row).getCell(col)
 
-            // --- 手術刀式字串替換策略 ---
-            // 直接在字串中定位 <c ... r="CELL_REF" ...>，準確找出標籤範圍並替換
+            const row = sheet.getRow(result.targetRow);
+            const cell = row.getCell(result.targetCol);
 
-            // 1. 定位 r="CELL_REF"
-            // 加引號確保精確匹配 (避免 G5 匹配到 G50)
-            const refStr = `r="${cellRef}"`;
-            const refIdx = sheetXml.indexOf(refStr);
+            // 直接更新值
+            // ExcelJS 會自動處理 Shared String 到 Number 的轉換
+            cell.value = Number(result.value);
 
-            if (refIdx === -1) {
-                console.log(`[XML] 找不到儲存格 ${cellRef} (indexOf 失敗)`);
-                return;
-            }
-
-            // 2. 往回找標籤開頭 <c
-            // 從 refIdx 往前找最近的 <c
-            const tagStart = sheetXml.lastIndexOf('<c', refIdx);
-            if (tagStart === -1) {
-                console.error(`[XML] 異常: 找到 r="${cellRef}" 但找不到開頭 <c`);
-                return;
-            }
-
-            // 3. 判斷標籤結束位置
-            // 先找標籤內部的結束角括號 >
-            const tagInnerEnd = sheetXml.indexOf('>', tagStart);
-            if (tagInnerEnd === -1) return; // 格式錯誤
-
-            let tagEnd = -1;
-            let originalTag = '';
-
-            // 檢查是否為 self-closing (/>)
-            if (sheetXml[tagInnerEnd - 1] === '/') {
-                // <c r="G5" ... />
-                tagEnd = tagInnerEnd + 1;
-            } else {
-                // <c r="G5" ...>...</c>
-                // 找尋對應的閉合標籤 </c>
-                // 從 tagInnerEnd 之後找
-                const closeTag = '</c>';
-                const closeTagIdx = sheetXml.indexOf(closeTag, tagInnerEnd);
-                if (closeTagIdx !== -1) {
-                    tagEnd = closeTagIdx + closeTag.length;
-                } else {
-                    console.error(`[XML] 異常: 儲存格 ${cellRef} 是展開的但找不到 </c>`);
-                    return;
-                }
-            }
-
-            originalTag = sheetXml.substring(tagStart, tagEnd);
-
-            // 4. 解析原有 Style (s="...")
-            // 簡單正則提取 s="123"
-            const styleMatch = originalTag.match(/ s="([0-9]+)"/);
-            const styleAttr = styleMatch ? ` s="${styleMatch[1]}"` : '';
-
-            // 5. 構建新標籤
-            // 始終展開為標準格式: <c r="..." s="..."> <v>...</v> </c>
-            // 這樣可以確保 t="s" (shared string) 被移除
-            const newTag = `<c r="${cellRef}"${styleAttr}><v>${value}</v></c>`;
-
-            // 6. 執行字串替換
-            // 因為每次只能替換一個，而且我們知道確切位置，可以使用 slice 組合
-            // sheetXml = sheetXml.replace(originalTag, newTag); -> replace 只會換第一個匹配的，
-            // 雖然 originalTag 理論上獨一無二 (包含 r=cellRef)，但用 slice 更保險且效能更好
-            sheetXml = sheetXml.substring(0, tagStart) + newTag + sheetXml.substring(tagEnd);
+            // 如果原本是公式，這樣會覆蓋公式，這是預期行為
 
             updatedCount++;
-            console.log(`[XML] 更新 ${cellRef}: 原本長度${originalTag.length} -> 新長度${newTag.length}`);
         });
 
-        console.log(`XML 更新完成，共修改 ${updatedCount} 個儲存格`);
+        console.log(`ExcelJS 更新完成，共修改 ${updatedCount} 個儲存格`);
 
-        // 寫回 ZIP
-        zip.file(sheetPath, sheetXml);
+        // 強制計算 (ExcelJS 不一定能完美控制 fullCalcOnLoad，但在 .xlsm 中通常 Excel 開啟時會重算)
+        // 嘗試設定 workbook 屬性
+        todayWorkbook.calcProperties.fullCalcOnLoad = true;
 
-        // --- 完整移除 calcChain (防止 Excel 報錯) ---
-        // 1. 刪除檔案
-        if (zip.file('xl/calcChain.xml')) {
-            zip.remove('xl/calcChain.xml');
-        }
+        // 寫出 Buffer
+        const buffer = await todayWorkbook.xlsx.writeBuffer();
 
-        // 2. 從 [Content_Types].xml 移除參照
-        const contentTypesPath = '[Content_Types].xml';
-        if (zip.file(contentTypesPath)) {
-            let contentTypesXml = await zip.file(contentTypesPath).async('string');
-            const calcChainTypePattern = /<Override PartName="\/xl\/calcChain\.xml" ContentType="[^"]*"\/>/g;
-            if (calcChainTypePattern.test(contentTypesXml)) {
-                contentTypesXml = contentTypesXml.replace(calcChainTypePattern, '');
-                zip.file(contentTypesPath, contentTypesXml);
-            }
-        }
-
-        // 3. 從 xl/_rels/workbook.xml.rels 移除關聯
-        const relsPath = 'xl/_rels/workbook.xml.rels';
-        if (zip.file(relsPath)) {
-            let relsXml = await zip.file(relsPath).async('string');
-            const calcChainRelPattern = /<Relationship[^>]*Target="calcChain\.xml"[^>]*\/>/g;
-            if (calcChainRelPattern.test(relsXml)) {
-                relsXml = relsXml.replace(calcChainRelPattern, '');
-                zip.file(relsPath, relsXml);
-            }
-        }
-
-        // 設定 fullCalcOnLoad 強制重新計算
-        const workbookPath = 'xl/workbook.xml';
-        if (zip.file(workbookPath)) {
-            let workbookXml = await zip.file(workbookPath).async('string');
-            if (!workbookXml.includes('fullCalcOnLoad')) {
-                if (workbookXml.includes('<calcPr')) {
-                    workbookXml = workbookXml.replace(
-                        /<calcPr([^>]*)\/>/,
-                        '<calcPr$1 fullCalcOnLoad="1"/>'
-                    );
-                    workbookXml = workbookXml.replace(
-                        /<calcPr([^>]*)>/,
-                        '<calcPr$1 fullCalcOnLoad="1">'
-                    );
-                }
-                zip.file(workbookPath, workbookXml);
-            }
-        }
-
-        // 生成檔案
-        const content = await zip.generateAsync({ type: 'blob' });
-        const url = URL.createObjectURL(content);
+        // 下載
+        const blob = new Blob([buffer], { type: 'application/vnd.ms-excel.sheet.macroEnabled.12' });
+        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
@@ -553,6 +454,6 @@ async function downloadResult() {
 
     } catch (error) {
         console.error('產生檔案時發生錯誤:', error);
-        alert('產生檔案時發生錯誤，請查看 Console');
+        alert('產生檔案時發生錯誤 (ExcelJS)，請查看 Console');
     }
 }
