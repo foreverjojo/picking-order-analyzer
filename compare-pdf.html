@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>PDF 比較分析</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+
+        .column {
+            flex: 1;
+        }
+
+        textarea {
+            width: 100%;
+            height: 400px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        h3 {
+            margin-top: 0;
+        }
+
+        .special-chars {
+            background: #fff3cd;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>PDF 比較分析工具</h1>
+
+    <div class="container">
+        <div class="column">
+            <h3>舊的蝦皮撿貨單</h3>
+            <input type="file" id="oldPdf" accept=".pdf">
+            <textarea id="oldContent" placeholder="載入後顯示內容..."></textarea>
+            <div id="oldSpecialChars" class="special-chars" style="display:none;"></div>
+        </div>
+        <div class="column">
+            <h3>今天的蝦皮撿貨單</h3>
+            <input type="file" id="newPdf" accept=".pdf">
+            <textarea id="newContent" placeholder="載入後顯示內容..."></textarea>
+            <div id="newSpecialChars" class="special-chars" style="display:none;"></div>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        async function extractPdfContent(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+            let allText = '';
+            const specialChars = [];
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+
+                textContent.items.forEach(item => {
+                    const text = item.str;
+                    allText += text + '\n';
+
+                    // 檢查特殊字符
+                    if (/<|>|&|'|"/.test(text)) {
+                        specialChars.push({
+                            page: i,
+                            text: text,
+                            chars: text.match(/[<>&'"]/g)
+                        });
+                    }
+                });
+                allText += '\n--- Page ' + i + ' End ---\n\n';
+            }
+
+            return { text: allText, specialChars };
+        }
+
+        document.getElementById('oldPdf').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const result = await extractPdfContent(file);
+            document.getElementById('oldContent').value = result.text;
+
+            if (result.specialChars.length > 0) {
+                const div = document.getElementById('oldSpecialChars');
+                div.style.display = 'block';
+                div.innerHTML = '<strong>發現特殊字符：</strong><br>' +
+                    result.specialChars.map(s => `Page ${s.page}: "${s.text}" (${s.chars.join(', ')})`).join('<br>');
+            }
+        });
+
+        document.getElementById('newPdf').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const result = await extractPdfContent(file);
+            document.getElementById('newContent').value = result.text;
+
+            if (result.specialChars.length > 0) {
+                const div = document.getElementById('newSpecialChars');
+                div.style.display = 'block';
+                div.innerHTML = '<strong>發現特殊字符：</strong><br>' +
+                    result.specialChars.map(s => `Page ${s.page}: "${s.text}" (${s.chars.join(', ')})`).join('<br>');
+            }
+        });
+    </script>
+</body>
+
+</html>
