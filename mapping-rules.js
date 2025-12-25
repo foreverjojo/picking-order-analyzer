@@ -340,9 +340,10 @@ function autoMapProductMomo(pickingName, pickingSpec, quantity) {
         else if (/15入/.test(fullTextNoSpace)) { column = 'C'; spec = '15入袋裝'; confidence = 0.85; }
         else if (/12入/.test(fullTextNoSpace)) { column = 'C'; spec = '12入袋裝'; confidence = 0.85; }
         else if (/8入/.test(fullTextNoSpace)) { column = 'B'; spec = '8入袋裝'; confidence = 0.85; }
-        // 單顆/活動專用
+        // 單顆/活動專用 - 瑪德蓮用 C 欄，其他用 D 欄
         else if (/單顆/.test(fullTextNoSpace) || /活動專用/.test(fullTextNoSpace) || /活動/.test(fullTextNoSpace)) {
-            column = 'C'; spec = '單顆'; confidence = 0.9;
+            const isMadeleine = /瑪德蓮/.test(fullTextNoSpace);
+            column = isMadeleine ? 'C' : 'D'; spec = '單顆'; confidence = 0.9;
             const activityMatch = specNoSpace.match(/(\d+)入/);
             if (activityMatch) {
                 multiplier = parseInt(activityMatch[1]);
@@ -678,13 +679,15 @@ function autoMapProductShopee(pickingName, pickingSpec, quantity) {
     else if (/15入/.test(nameNoSpace) && !/10入/.test(specNoSpace)) { column = 'C'; spec = '15入袋裝'; confidence = 0.85; }
     else if (/12入/.test(nameNoSpace)) { column = 'C'; spec = '12入袋裝'; confidence = 0.85; }
     else if (/8入/.test(nameNoSpace)) { column = 'B'; spec = '8入袋裝'; confidence = 0.85; }
-    // 活動專用
+    // 活動專用 - 瑪德蓮用 C 欄，其他用 D 欄
     else if (/單顆/.test(fullText) || /單個/.test(fullText)) {
-        column = 'C'; spec = '單顆'; confidence = 0.85;
+        const isMadeleine = /瑪德蓮/.test(fullTextNoSpaceTemp);
+        column = isMadeleine ? 'C' : 'D'; spec = '單顆'; confidence = 0.85;
         const singleMatch = specNoSpace.match(/(\d+)入/);
         if (singleMatch) multiplier = parseInt(singleMatch[1]);
     } else if (/\d+入/.test(specNoSpace) && /活動/.test(fullTextNoSpaceTemp)) {
-        column = 'C'; spec = '單顆'; confidence = 0.8;
+        const isMadeleine = /瑪德蓮/.test(fullTextNoSpaceTemp);
+        column = isMadeleine ? 'C' : 'D'; spec = '單顆'; confidence = 0.8;
         const activityMatch = specNoSpace.match(/(\d+)入/);
         if (activityMatch) multiplier = parseInt(activityMatch[1]);
     }
