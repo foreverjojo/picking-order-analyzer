@@ -30,28 +30,8 @@ const productNameMapping = {
     'M4抹茶': '瑪德蓮-抹茶',
     'M5柑橘': '瑪德蓮-柑橘',
     'M6檸檬': '瑪德蓮-檸檬',
-    // 堅果類
-    '無調味綜合堅果': '無調味綜合堅果',
-    '無調味夏威夷豆': '無調味夏威夷豆',
-    '無調味腰果': '無調味腰果',
-    '無調味杏仁': '無調味杏仁',
-    '無調味核桃': '無調味核桃',
-    '綜合堅果': '綜合堅果',
-    '夏威夷豆': '夏威夷豆',
-    '腰果': '腰果',
-    '杏仁': '杏仁',
-    '核桃': '核桃',
-    // 椰棗類
-    '★中東椰棗300g': '★中東椰棗300g',
-    '椰棗豆子150g': '椰棗豆子150g',
-    '椰棗腰果150g': '椰棗腰果150g',
-    '椰棗杏仁150g': '椰棗杏仁150g',
-    '椰棗核桃150g': '椰棗核桃150g',
-    '中東椰棗': '中東椰棗',
-    '椰棗豆子': '椰棗豆子',
-    '椰棗腰果': '椰棗腰果',
-    '椰棗杏仁': '椰棗杏仁',
-    '椰棗核桃': '椰棗核桃',
+    // 堅果類 - 注意：不在此處設置映射，由動態邏輯處理 (來源名 -> 無調味+名)
+    // 椰棗類 - 注意：不在此處設置映射，由動態邏輯處理 (來源名 -> ★中東椰棗300g 或 名+150g)
     // 糖果類
     'S1牛奶糖': '牛奶糖',
     'S2核桃糕': '南棗核桃糕',
@@ -331,14 +311,15 @@ async function performTransfer() {
             return;
         }
 
-        // 判斷類別：優先使用 getProductCategory，但如果是曖昧名稱則使用區段
-        let category = getProductCategory(sourceName);
+        // 判斷類別：對於曖昧名稱，區段追蹤優先於 getProductCategory
+        let category;
 
-        // 如果無法判斷類別，且該名稱在曖昧名稱列表中，使用當前區段
-        if (!category && ambiguousNames.has(sourceName) && currentSection) {
+        // 如果是曖昧名稱且有區段上下文，直接使用區段
+        if (ambiguousNames.has(sourceName) && currentSection) {
             category = currentSection;
             console.log(`Row ${rowNumber}: "${sourceName}" -> 使用區段推斷類別: ${category}`);
         } else {
+            category = getProductCategory(sourceName);
             console.log(`Row ${rowNumber}: "${sourceName}" -> 類別: ${category || '無'}`);
         }
 
