@@ -342,7 +342,7 @@ function autoMapProductMomo(pickingName, pickingSpec, quantity) {
         else if (/8入/.test(fullTextNoSpace)) { column = 'B'; spec = '8入袋裝'; confidence = 0.85; }
         // 單顆/活動專用
         else if (/單顆/.test(fullTextNoSpace) || /活動專用/.test(fullTextNoSpace) || /活動/.test(fullTextNoSpace)) {
-            column = 'D'; spec = '單顆'; confidence = 0.9;
+            column = 'C'; spec = '單顆'; confidence = 0.9;
             const activityMatch = specNoSpace.match(/(\d+)入/);
             if (activityMatch) {
                 multiplier = parseInt(activityMatch[1]);
@@ -680,11 +680,11 @@ function autoMapProductShopee(pickingName, pickingSpec, quantity) {
     else if (/8入/.test(nameNoSpace)) { column = 'B'; spec = '8入袋裝'; confidence = 0.85; }
     // 活動專用
     else if (/單顆/.test(fullText) || /單個/.test(fullText)) {
-        column = 'D'; spec = '單顆'; confidence = 0.85;
+        column = 'C'; spec = '單顆'; confidence = 0.85;
         const singleMatch = specNoSpace.match(/(\d+)入/);
         if (singleMatch) multiplier = parseInt(singleMatch[1]);
     } else if (/\d+入/.test(specNoSpace) && /活動/.test(fullTextNoSpaceTemp)) {
-        column = 'D'; spec = '單顆'; confidence = 0.8;
+        column = 'C'; spec = '單顆'; confidence = 0.8;
         const activityMatch = specNoSpace.match(/(\d+)入/);
         if (activityMatch) multiplier = parseInt(activityMatch[1]);
     }
