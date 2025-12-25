@@ -490,40 +490,11 @@ async function downloadResult() {
         // 寫回 ZIP
         zip.file(sheetPath, sheetXml);
 
-        // --- 完整移除 calcChain (防止 Excel 報錯) ---
-        // 1. 刪除檔案
-        if (zip.file('xl/calcChain.xml')) {
-            zip.remove('xl/calcChain.xml');
-        }
-
-        // 2. 從 [Content_Types].xml 移除參照
-        const contentTypesPath = '[Content_Types].xml';
-        if (zip.file(contentTypesPath)) {
-            let contentTypesXml = await zip.file(contentTypesPath).async('string');
-            // 改為更寬鬆的匹配，避免 Attribute 順序問題
-            // <Override PartName="/xl/calcChain.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml"/>
-            const calcChainTypePattern = /<Override PartName="\/xl\/calcChain\.xml"[^>]*\/>/g;
-            if (calcChainTypePattern.test(contentTypesXml)) {
-                contentTypesXml = contentTypesXml.replace(calcChainTypePattern, '');
-                zip.file(contentTypesPath, contentTypesXml);
-            }
-        }
-
-        // 3. 從 xl/_rels/workbook.xml.rels 移除關聯
-        const relsPath = 'xl/_rels/workbook.xml.rels';
-        if (zip.file(relsPath)) {
-            let relsXml = await zip.file(relsPath).async('string');
-            // <Relationship Id="rIdX" Type=".../calcChain" Target="calcChain.xml"/>
-            // Target 可能是 "calcChain.xml" 或 "/xl/calcChain.xml"
-            const calcChainRelPattern = /<Relationship[^>]*Target=".*?calcChain\.xml"[^>]*\/>/g;
-            if (calcChainRelPattern.test(relsXml)) {
-                relsXml = relsXml.replace(calcChainRelPattern, '');
-                zip.file(relsPath, relsXml);
-            }
-        }
-
-        // 注意：不修改 workbook.xml (避免破壞結構)
-        // Excel 會自動偵測 calcChain 遺失並重建
+        // --- 修正策略：不移除 calcChain 或修改 _rels ---
+        // 之前的嘗試顯示修改 _rels/workbook.xml.rels 可能導致 Excel 找不到其他工作表 (如 Sheet 3 消失)
+        // 由於我們只修改了 Sheet 1 的儲存格數值 (且移除了 shared string 依賴)，
+        // Excel 應該能自動偵測並在開啟時重新計算，頂多跳出輕微的修復警告，而不會掉資料。
+        // 這是目前最安全的做法。
 
         // 生成檔案
         const content = await zip.generateAsync({ type: 'blob' });
