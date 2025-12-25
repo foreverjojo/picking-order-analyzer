@@ -456,8 +456,9 @@ async function downloadResult() {
         }
 
         // 4. 含公式的儲存格
+        // Update to use [\s\S] for dot matching to handle newlines
         const formulaCellPattern = new RegExp(
-            `(<c r="${cellRef}"[^>]*?)( t="[^"]*")?([^>]*?>)(<f>[^<]*</f>)(<v>[^<]*</v>)?(</c>)`
+            `(<c r="${cellRef}"[^>]*?)( t="[^"]*")?([^>]*?>)(<f>[\\s\\S]*?</f>)(<v>[\\s\\S]*?</v>)?(</c>)`
         );
         if (sheetXml.match(formulaCellPattern)) {
             // 移除 t 屬性，並更新公式計算結果
@@ -472,10 +473,36 @@ async function downloadResult() {
     // 寫回 ZIP
     zip.file(sheetPath, sheetXml);
 
-    /* 
-    注意：不刪除 calcChain.xml，因為如果只從 Content_Types 移除但沒更新被參照的關係檔，
-    會導致 Excel 報錯。保留它讓 Excel 自動修復比較安全。
-    */
+    // --- 完整移除 calcChain (防止 Excel 報錯) ---
+    // 1. 刪除檔案
+    if (zip.file('xl/calcChain.xml')) {
+        zip.remove('xl/calcChain.xml');
+    }
+
+    // 2. 從 [Content_Types].xml 移除參照
+    const contentTypesPath = '[Content_Types].xml';
+    if (zip.file(contentTypesPath)) {
+        let contentTypesXml = await zip.file(contentTypesPath).async('string');
+        // 使用簡單的字串替換，移除 Override 標籤
+        const calcChainTypePattern = /<Override PartName="\/xl\/calcChain\.xml" ContentType="[^"]*"\/>/g;
+        if (calcChainTypePattern.test(contentTypesXml)) {
+            contentTypesXml = contentTypesXml.replace(calcChainTypePattern, '');
+            zip.file(contentTypesPath, contentTypesXml);
+        }
+    }
+
+    // 3. 從 xl/_rels/workbook.xml.rels 移除關聯
+    const relsPath = 'xl/_rels/workbook.xml.rels';
+    if (zip.file(relsPath)) {
+        let relsXml = await zip.file(relsPath).async('string');
+        // 尋找並移除 Relationship
+        // <Relationship Id="rIdX" Type=".../calcChain" Target="calcChain.xml"/>
+        const calcChainRelPattern = /<Relationship[^>]*Target="calcChain\.xml"[^>]*\/>/g;
+        if (calcChainRelPattern.test(relsXml)) {
+            relsXml = relsXml.replace(calcChainRelPattern, '');
+            zip.file(relsPath, relsXml);
+        }
+    }
 
     // 設定 fullCalcOnLoad 強制重新計算
     const workbookPath = 'xl/workbook.xml';
