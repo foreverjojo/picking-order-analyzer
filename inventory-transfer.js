@@ -409,94 +409,90 @@ async function downloadResult() {
 
         // 讀取 sheet1.xml
         const sheetPath = 'xl/worksheets/sheet1.xml';
-        const sheetXml = await zip.file(sheetPath).async('string');
-
-        // 使用 DOMParser 解析 XML (比正則表達式更安全且正確)
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(sheetXml, "application/xml");
-
-        const parserError = xmlDoc.querySelector('parsererror');
-        if (parserError) {
-            console.error('XML Parsing Error:', parserError.textContent);
-            alert('無法解析 Excel 檔案內容，請檢查範本是否損毀');
-            return;
-        }
-
-        // 建立所有現有儲存格的索引 (加快查找速度)
-        const cellMap = new Map();
-        const allCells = xmlDoc.getElementsByTagName('c'); // 這樣會自動處理 namespace
-        for (let i = 0; i < allCells.length; i++) {
-            const c = allCells[i];
-            const r = c.getAttribute('r');
-            if (r) cellMap.set(r, c);
-        }
-
-        // 獲取正確的 namespace URI (通常在根元素)
-        const ns = xmlDoc.documentElement.getAttribute('xmlns') || "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+        let sheetXml = await zip.file(sheetPath).async('string');
 
         // 將 transferResults 中的數據寫入 XML
         let updatedCount = 0;
+
         transferResults.forEach(result => {
             const cellRef = result.targetCol + result.targetRow;
             const value = result.value;
 
             if (value === null || value === undefined) return;
 
-            const cell = cellMap.get(cellRef);
-            if (cell) {
-                // 1. 移除 't' 屬性 (移除 t="s" 或 t="str" 等，預設即為數值)
-                if (cell.hasAttribute('t')) {
-                    cell.removeAttribute('t');
-                }
+            // --- 手術刀式字串替換策略 ---
+            // 直接在字串中定位 <c ... r="CELL_REF" ...>，準確找出標籤範圍並替換
 
-                // 2. 清除子元素 <f>, <v>, <is>，保留原始樣式屬性 (s="...")
-                // 從後往前刪除比較安全
-                let child = cell.lastElementChild;
-                while (child) {
-                    if (['f', 'v', 'is'].includes(child.localName)) {
-                        cell.removeChild(child);
-                    }
-                    child = child.previousElementSibling;
-                }
+            // 1. 定位 r="CELL_REF"
+            // 加引號確保精確匹配 (避免 G5 匹配到 G50)
+            const refStr = `r="${cellRef}"`;
+            const refIdx = sheetXml.indexOf(refStr);
 
-                // 3. 加入新的值 <v>value</v>
-                const vNode = xmlDoc.createElementNS(ns, 'v');
-                vNode.textContent = value;
-                cell.appendChild(vNode);
-
-                updatedCount++;
-                console.log(`[XML] 若更新儲存格 ${cellRef}: ${new XMLSerializer().serializeToString(cell)}`);
-            } else {
-                console.log(`[XML] 儲存格 ${cellRef} 在模板中不存在，跳過更新`);
-                // 將來若需要新增儲存格，需在此處理 (需找到正確的 row 並按順序插入)
+            if (refIdx === -1) {
+                console.log(`[XML] 找不到儲存格 ${cellRef} (indexOf 失敗)`);
+                return;
             }
+
+            // 2. 往回找標籤開頭 <c
+            // 從 refIdx 往前找最近的 <c
+            const tagStart = sheetXml.lastIndexOf('<c', refIdx);
+            if (tagStart === -1) {
+                console.error(`[XML] 異常: 找到 r="${cellRef}" 但找不到開頭 <c`);
+                return;
+            }
+
+            // 3. 判斷標籤結束位置
+            // 先找標籤內部的結束角括號 >
+            const tagInnerEnd = sheetXml.indexOf('>', tagStart);
+            if (tagInnerEnd === -1) return; // 格式錯誤
+
+            let tagEnd = -1;
+            let originalTag = '';
+
+            // 檢查是否為 self-closing (/>)
+            if (sheetXml[tagInnerEnd - 1] === '/') {
+                // <c r="G5" ... />
+                tagEnd = tagInnerEnd + 1;
+            } else {
+                // <c r="G5" ...>...</c>
+                // 找尋對應的閉合標籤 </c>
+                // 從 tagInnerEnd 之後找
+                const closeTag = '</c>';
+                const closeTagIdx = sheetXml.indexOf(closeTag, tagInnerEnd);
+                if (closeTagIdx !== -1) {
+                    tagEnd = closeTagIdx + closeTag.length;
+                } else {
+                    console.error(`[XML] 異常: 儲存格 ${cellRef} 是展開的但找不到 </c>`);
+                    return;
+                }
+            }
+
+            originalTag = sheetXml.substring(tagStart, tagEnd);
+
+            // 4. 解析原有 Style (s="...")
+            // 簡單正則提取 s="123"
+            const styleMatch = originalTag.match(/ s="([0-9]+)"/);
+            const styleAttr = styleMatch ? ` s="${styleMatch[1]}"` : '';
+
+            // 5. 構建新標籤
+            // 始終展開為標準格式: <c r="..." s="..."> <v>...</v> </c>
+            // 這樣可以確保 t="s" (shared string) 被移除
+            const newTag = `<c r="${cellRef}"${styleAttr}><v>${value}</v></c>`;
+
+            // 6. 執行字串替換
+            // 因為每次只能替換一個，而且我們知道確切位置，可以使用 slice 組合
+            // sheetXml = sheetXml.replace(originalTag, newTag); -> replace 只會換第一個匹配的，
+            // 雖然 originalTag 理論上獨一無二 (包含 r=cellRef)，但用 slice 更保險且效能更好
+            sheetXml = sheetXml.substring(0, tagStart) + newTag + sheetXml.substring(tagEnd);
+
+            updatedCount++;
+            console.log(`[XML] 更新 ${cellRef}: 原本長度${originalTag.length} -> 新長度${newTag.length}`);
         });
 
         console.log(`XML 更新完成，共修改 ${updatedCount} 個儲存格`);
 
-        // 序列化回 XML 字串
-        const serializer = new XMLSerializer();
-        let newSheetXml = serializer.serializeToString(xmlDoc);
-
-        // --- 修正: 移除 XMLSerializer 自動加入的冗餘 xmlns 屬性 ---
-        // DOMParser/XMLSerializer 為了嚴謹，常會在每個子元素補上 xmlns，這會導致 Excel 檔案大小暴增甚至報錯
-        // 我們將其移除，只保留 root 的 xmlns
-        const targetNs = ' xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
-
-        // 1. 先把所有的 namespace 宣告移除
-        newSheetXml = newSheetXml.split(targetNs).join('');
-
-        // 2. 確保 root <worksheet> 標籤有正確的 namespace
-        // 原本 root 可能長這樣 <worksheet xmlns="..." ...> 或 <worksheet ...>
-        // 因為上面全移除了，這裡要補回去。通常 <worksheet> 是第一個標籤
-        if (!newSheetXml.includes(targetNs)) {
-            newSheetXml = newSheetXml.replace('<worksheet', `<worksheet${targetNs}`);
-        }
-
-        console.log('XML Namespace 清理完成');
-
         // 寫回 ZIP
-        zip.file(sheetPath, newSheetXml);
+        zip.file(sheetPath, sheetXml);
 
         // --- 完整移除 calcChain (防止 Excel 報錯) ---
         // 1. 刪除檔案
