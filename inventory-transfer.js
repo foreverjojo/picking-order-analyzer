@@ -403,107 +403,143 @@ function showResults() {
 }
 
 async function downloadResult() {
-    // 使用 JSZip 直接修改 XML，保留 .xlsm 格式和巨集
-    const zip = await JSZip.loadAsync(todayFileBuffer);
+    try {
+        // 使用 JSZip 直接修改 XML，保留 .xlsm 格式和巨集
+        const zip = await JSZip.loadAsync(todayFileBuffer);
 
-    // 讀取 sheet1.xml
-    const sheetPath = 'xl/worksheets/sheet1.xml';
-    let sheetXml = await zip.file(sheetPath).async('string');
+        // 讀取 sheet1.xml
+        const sheetPath = 'xl/worksheets/sheet1.xml';
+        const sheetXml = await zip.file(sheetPath).async('string');
 
-    // 將 transferResults 中的數據寫入 XML
-    transferResults.forEach(result => {
-        const cellRef = result.targetCol + result.targetRow;
-        const value = result.value;
+        // 使用 DOMParser 解析 XML (比正則表達式更安全且正確)
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(sheetXml, "application/xml");
 
-        if (value === null || value === undefined) {
-            console.log(`儲存格 ${cellRef} 值為 null/undefined，跳過更新`);
+        const parserError = xmlDoc.querySelector('parsererror');
+        if (parserError) {
+            console.error('XML Parsing Error:', parserError.textContent);
+            alert('無法解析 Excel 檔案內容，請檢查範本是否損毀');
             return;
         }
 
-        // 使用更穩健的策略：找到該儲存格的完整標籤，然後重構它
-        // 匹配模式：<c ... r="CELL_REF" ... /> 或 <c ... r="CELL_REF" ...>...</c>
-        // 注意：屬性順序不固定，所以不能假設 r 在前或後
-        const cellRegex = new RegExp(`<c(?=[^>]*r="${cellRef}"(?: |>|/))[^>]*?(/?>|[\\s\\S]*?</c>)`);
-
-        const match = sheetXml.match(cellRegex);
-        if (match) {
-            const originalTag = match[0];
-
-            // 提取 style 屬性 (s="123")
-            const styleMatch = originalTag.match(/ s="([^"]*)"/);
-            const styleAttr = styleMatch ? ` s="${styleMatch[1]}"` : '';
-
-            // 構建新的乾淨標籤 (移除 t 屬性，保留 r 和 s)
-            // 強制寫入數值
-            const newTag = `<c r="${cellRef}"${styleAttr}><v>${value}</v></c>`;
-
-            sheetXml = sheetXml.replace(originalTag, newTag);
-            console.log(`重構並更新儲存格 ${cellRef}: ${newTag}`);
-        } else {
-            console.log(`儲存格 ${cellRef} 在 XML 中未找到 (可能模板中該行缺少此欄位)`);
+        // 建立所有現有儲存格的索引 (加快查找速度)
+        const cellMap = new Map();
+        const allCells = xmlDoc.getElementsByTagName('c'); // 這樣會自動處理 namespace
+        for (let i = 0; i < allCells.length; i++) {
+            const c = allCells[i];
+            const r = c.getAttribute('r');
+            if (r) cellMap.set(r, c);
         }
-    });
 
-    // 寫回 ZIP
-    zip.file(sheetPath, sheetXml);
+        // 獲取正確的 namespace URI (通常在根元素)
+        const ns = xmlDoc.documentElement.getAttribute('xmlns') || "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
-    // --- 完整移除 calcChain (防止 Excel 報錯) ---
-    // 1. 刪除檔案
-    if (zip.file('xl/calcChain.xml')) {
-        zip.remove('xl/calcChain.xml');
-    }
+        // 將 transferResults 中的數據寫入 XML
+        let updatedCount = 0;
+        transferResults.forEach(result => {
+            const cellRef = result.targetCol + result.targetRow;
+            const value = result.value;
 
-    // 2. 從 [Content_Types].xml 移除參照
-    const contentTypesPath = '[Content_Types].xml';
-    if (zip.file(contentTypesPath)) {
-        let contentTypesXml = await zip.file(contentTypesPath).async('string');
-        // 使用簡單的字串替換，移除 Override 標籤
-        const calcChainTypePattern = /<Override PartName="\/xl\/calcChain\.xml" ContentType="[^"]*"\/>/g;
-        if (calcChainTypePattern.test(contentTypesXml)) {
-            contentTypesXml = contentTypesXml.replace(calcChainTypePattern, '');
-            zip.file(contentTypesPath, contentTypesXml);
-        }
-    }
+            if (value === null || value === undefined) return;
 
-    // 3. 從 xl/_rels/workbook.xml.rels 移除關聯
-    const relsPath = 'xl/_rels/workbook.xml.rels';
-    if (zip.file(relsPath)) {
-        let relsXml = await zip.file(relsPath).async('string');
-        // 尋找並移除 Relationship
-        // <Relationship Id="rIdX" Type=".../calcChain" Target="calcChain.xml"/>
-        const calcChainRelPattern = /<Relationship[^>]*Target="calcChain\.xml"[^>]*\/>/g;
-        if (calcChainRelPattern.test(relsXml)) {
-            relsXml = relsXml.replace(calcChainRelPattern, '');
-            zip.file(relsPath, relsXml);
-        }
-    }
+            const cell = cellMap.get(cellRef);
+            if (cell) {
+                // 1. 移除 't' 屬性 (移除 t="s" 或 t="str" 等，預設即為數值)
+                if (cell.hasAttribute('t')) {
+                    cell.removeAttribute('t');
+                }
 
-    // 設定 fullCalcOnLoad 強制重新計算
-    const workbookPath = 'xl/workbook.xml';
-    if (zip.file(workbookPath)) {
-        let workbookXml = await zip.file(workbookPath).async('string');
-        if (!workbookXml.includes('fullCalcOnLoad')) {
-            if (workbookXml.includes('<calcPr')) {
-                workbookXml = workbookXml.replace(
-                    /<calcPr([^>]*)\/>/,
-                    '<calcPr$1 fullCalcOnLoad="1"/>'
-                );
-                workbookXml = workbookXml.replace(
-                    /<calcPr([^>]*)>/,
-                    '<calcPr$1 fullCalcOnLoad="1">'
-                );
+                // 2. 清除子元素 <f>, <v>, <is>，保留原始樣式屬性 (s="...")
+                // 從後往前刪除比較安全
+                let child = cell.lastElementChild;
+                while (child) {
+                    if (['f', 'v', 'is'].includes(child.localName)) {
+                        cell.removeChild(child);
+                    }
+                    child = child.previousElementSibling;
+                }
+
+                // 3. 加入新的值 <v>value</v>
+                const vNode = xmlDoc.createElementNS(ns, 'v');
+                vNode.textContent = value;
+                cell.appendChild(vNode);
+
+                updatedCount++;
+                console.log(`[XML] 若更新儲存格 ${cellRef}: ${new XMLSerializer().serializeToString(cell)}`);
+            } else {
+                console.log(`[XML] 儲存格 ${cellRef} 在模板中不存在，跳過更新`);
+                // 將來若需要新增儲存格，需在此處理 (需找到正確的 row 並按順序插入)
             }
-            zip.file(workbookPath, workbookXml);
-        }
-    }
+        });
 
-    // 生成檔案
-    const content = await zip.generateAsync({ type: 'blob' });
-    const url = URL.createObjectURL(content);
-    const a = document.createElement('a');
-    a.href = url;
-    const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
-    a.download = `生產統計表_庫存已轉移_${today}.xlsm`;
-    a.click();
-    URL.revokeObjectURL(url);
+        console.log(`XML 更新完成，共修改 ${updatedCount} 個儲存格`);
+
+        // 序列化回 XML 字串
+        const serializer = new XMLSerializer();
+        const newSheetXml = serializer.serializeToString(xmlDoc);
+
+        // 寫回 ZIP
+        zip.file(sheetPath, newSheetXml);
+
+        // --- 完整移除 calcChain (防止 Excel 報錯) ---
+        // 1. 刪除檔案
+        if (zip.file('xl/calcChain.xml')) {
+            zip.remove('xl/calcChain.xml');
+        }
+
+        // 2. 從 [Content_Types].xml 移除參照
+        const contentTypesPath = '[Content_Types].xml';
+        if (zip.file(contentTypesPath)) {
+            let contentTypesXml = await zip.file(contentTypesPath).async('string');
+            const calcChainTypePattern = /<Override PartName="\/xl\/calcChain\.xml" ContentType="[^"]*"\/>/g;
+            if (calcChainTypePattern.test(contentTypesXml)) {
+                contentTypesXml = contentTypesXml.replace(calcChainTypePattern, '');
+                zip.file(contentTypesPath, contentTypesXml);
+            }
+        }
+
+        // 3. 從 xl/_rels/workbook.xml.rels 移除關聯
+        const relsPath = 'xl/_rels/workbook.xml.rels';
+        if (zip.file(relsPath)) {
+            let relsXml = await zip.file(relsPath).async('string');
+            const calcChainRelPattern = /<Relationship[^>]*Target="calcChain\.xml"[^>]*\/>/g;
+            if (calcChainRelPattern.test(relsXml)) {
+                relsXml = relsXml.replace(calcChainRelPattern, '');
+                zip.file(relsPath, relsXml);
+            }
+        }
+
+        // 設定 fullCalcOnLoad 強制重新計算
+        const workbookPath = 'xl/workbook.xml';
+        if (zip.file(workbookPath)) {
+            let workbookXml = await zip.file(workbookPath).async('string');
+            if (!workbookXml.includes('fullCalcOnLoad')) {
+                if (workbookXml.includes('<calcPr')) {
+                    workbookXml = workbookXml.replace(
+                        /<calcPr([^>]*)\/>/,
+                        '<calcPr$1 fullCalcOnLoad="1"/>'
+                    );
+                    workbookXml = workbookXml.replace(
+                        /<calcPr([^>]*)>/,
+                        '<calcPr$1 fullCalcOnLoad="1">'
+                    );
+                }
+                zip.file(workbookPath, workbookXml);
+            }
+        }
+
+        // 生成檔案
+        const content = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(content);
+        const a = document.createElement('a');
+        a.href = url;
+        const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+        a.download = `生產統計表_庫存已轉移_${today}.xlsm`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+    } catch (error) {
+        console.error('產生檔案時發生錯誤:', error);
+        alert('產生檔案時發生錯誤，請查看 Console');
+    }
 }
