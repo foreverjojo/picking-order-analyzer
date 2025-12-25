@@ -265,7 +265,7 @@ async function performTransfer() {
 
     // 遍歷昨天報表工作表 2 的每一行
     sheet2.eachRow((row, rowNumber) => {
-        const cellA = row.getCell(1).value;
+        const cellA = getCellValue(row.getCell(1));
         if (!cellA) return;
 
         const sourceName = String(cellA).trim();
