@@ -52,6 +52,7 @@ const productNameMapping = {
     'S1牛奶糖': '牛奶糖',
     'S2核桃糕': '南棗核桃糕',
     '牛奶糖-50g': '牛奶糖-50g',
+    '牛奶糖50g': '牛奶糖-50g',
     '牛奶糖': '牛奶糖',
     '南棗核桃糕': '南棗核桃糕',
     // 瓦片類
@@ -125,11 +126,12 @@ function getProductCategory(productName) {
     if (/^P\d|鳳梨酥|鳳凰酥/.test(name)) return '酥餅';
     if (/^H\d|雪花餅/.test(name)) return '雪花餅';
     if (/^M\d|瑪德蓮/.test(name)) return '瑪德蓮';
-    if (/綜合堅果|夏威夷豆|腰果|杏仁|核桃/.test(name) && !/椰棗/.test(name)) return '堅果類';
+    // 糖果類要在堅果類之前檢測（避免「核桃糕」被當成「核桃」）
+    if (/^S\d|牛奶糖|核桃糕|南棗/.test(name)) return '糖果類';
     if (/椰棗/.test(name)) return '椰棗類';
-    if (/牛奶糖|核桃糕|糖果/.test(name)) return '糖果類';
+    if (/綜合堅果|夏威夷豆|腰果|杏仁|核桃/.test(name) && !/椰棗|糕/.test(name)) return '堅果類';
     if (/瓦片|原味|紅茶|海苔|抹茶|黑糖|青花椒/.test(name) && !/餅乾|西點|奶油/.test(name)) return '瓦片類';
-    if (/奶油|焦糖牛奶|法國巧克力|蜂蜜檸檬|伯爵紅茶/.test(name)) return '奶油餅乾';
+    if (/奶油餅乾|焦糖牛奶|法國巧克力|蜂蜜檸檬|伯爵紅茶/.test(name) && !/牛奶糖/.test(name)) return '奶油餅乾';
     if (/西點|西餅|貝殼|小花|酥條/.test(name)) return '西餅餅乾';
     if (/千層/.test(name)) return '千層餅乾';
     return null;
