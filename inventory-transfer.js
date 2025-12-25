@@ -420,54 +420,28 @@ async function downloadResult() {
             return;
         }
 
-        // --- 核心修正：避免 Shared String 衝突 ---
-        // 我們要寫入的是數值（<v>123</v>），但如果原儲存格有 t="s"（共享字串），
-        // 必須把 t="s" 屬性移除，否則 Excel 會把數值當作字串索引而崩潰
+        // 使用更穩健的策略：找到該儲存格的完整標籤，然後重構它
+        // 匹配模式：<c ... r="CELL_REF" ... /> 或 <c ... r="CELL_REF" ...>...</c>
+        // 注意：屬性順序不固定，所以不能假設 r 在前或後
+        const cellRegex = new RegExp(`<c(?=[^>]*r="${cellRef}"(?: |>|/))[^>]*?(/?>|[\\s\\S]*?</c>)`);
 
-        // 1. 已有值的儲存格
-        const cellWithValuePattern = new RegExp(
-            `(<c r="${cellRef}"[^>]*?)( t="[^"]*")?([^>]*?>)(.*?)(<v>[^<]*</v>)(.*?)(</c>)`
-        );
-        if (sheetXml.match(cellWithValuePattern)) {
-            // $1: <c r="G5" s="1"
-            // $2: t="s" (可能存在) -> 我們不放回這個
-            // $3: >
-            // $5: <v>old</v> -> 換成 <v>new</v>
-            sheetXml = sheetXml.replace(cellWithValuePattern, `$1$3<v>${value}</v>$6$7`);
-            console.log(`更新儲存格 ${cellRef} 的值為 ${value}`);
-            return;
+        const match = sheetXml.match(cellRegex);
+        if (match) {
+            const originalTag = match[0];
+
+            // 提取 style 屬性 (s="123")
+            const styleMatch = originalTag.match(/ s="([^"]*)"/);
+            const styleAttr = styleMatch ? ` s="${styleMatch[1]}"` : '';
+
+            // 構建新的乾淨標籤 (移除 t 屬性，保留 r 和 s)
+            // 強制寫入數值
+            const newTag = `<c r="${cellRef}"${styleAttr}><v>${value}</v></c>`;
+
+            sheetXml = sheetXml.replace(originalTag, newTag);
+            console.log(`重構並更新儲存格 ${cellRef}: ${newTag}`);
+        } else {
+            console.log(`儲存格 ${cellRef} 在 XML 中未找到 (可能模板中該行缺少此欄位)`);
         }
-
-        // 2. 空儲存格：<c r="G5" .../>
-        const emptyCellPattern = new RegExp(`<c r="${cellRef}"([^/>]*?)( t="[^"]*")?([^/>]*?)/>`);
-        if (sheetXml.match(emptyCellPattern)) {
-            // 移除可能存在的 t 屬性，並展開為 <c ...><v>...</v></c>
-            sheetXml = sheetXml.replace(emptyCellPattern, `<c r="${cellRef}"$1$3><v>${value}</v></c>`);
-            console.log(`填入空儲存格 ${cellRef} 值為 ${value}`);
-            return;
-        }
-
-        // 3. 空內容儲存格：<c r="G5" ...></c>
-        const emptyContentCellPattern = new RegExp(`(<c r="${cellRef}"[^>]*?)( t="[^"]*")?([^>]*?>)(</c>)`);
-        if (sheetXml.match(emptyContentCellPattern)) {
-            sheetXml = sheetXml.replace(emptyContentCellPattern, `$1$3<v>${value}</v>$4`);
-            console.log(`填入空內容儲存格 ${cellRef} 值為 ${value}`);
-            return;
-        }
-
-        // 4. 含公式的儲存格
-        // Update to use [\s\S] for dot matching to handle newlines
-        const formulaCellPattern = new RegExp(
-            `(<c r="${cellRef}"[^>]*?)( t="[^"]*")?([^>]*?>)(<f>[\\s\\S]*?</f>)(<v>[\\s\\S]*?</v>)?(</c>)`
-        );
-        if (sheetXml.match(formulaCellPattern)) {
-            // 移除 t 屬性，並更新公式計算結果
-            sheetXml = sheetXml.replace(formulaCellPattern, `$1$3$4<v>${value}</v>$6`);
-            console.log(`更新公式儲存格 ${cellRef} 的值為 ${value}`);
-            return;
-        }
-
-        console.log(`儲存格 ${cellRef} 在 XML 中未找到匹配模式`);
     });
 
     // 寫回 ZIP
