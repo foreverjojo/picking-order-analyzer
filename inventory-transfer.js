@@ -161,42 +161,56 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function handleYesterdayFile(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+    try {
+        const file = e.target.files[0];
+        if (!file) return;
 
-    document.getElementById('yesterdayFileName').textContent = file.name;
-    document.getElementById('yesterdayBox').classList.add('has-file');
+        console.log('開始讀取昨天報表:', file.name);
+        document.getElementById('yesterdayFileName').textContent = file.name;
+        document.getElementById('yesterdayBox').classList.add('has-file');
 
-    const arrayBuffer = await file.arrayBuffer();
-    yesterdayWorkbook = new ExcelJS.Workbook();
-    await yesterdayWorkbook.xlsx.load(arrayBuffer);
+        const arrayBuffer = await file.arrayBuffer();
+        yesterdayWorkbook = new ExcelJS.Workbook();
+        await yesterdayWorkbook.xlsx.load(arrayBuffer);
 
-    console.log('昨天報表已載入:', yesterdayWorkbook.worksheets.map(ws => ws.name));
-    checkReadyToTransfer();
+        console.log('昨天報表已載入:', yesterdayWorkbook.worksheets.map(ws => ws.name));
+        checkReadyToTransfer();
+    } catch (error) {
+        console.error('讀取昨天報表失敗:', error);
+        alert('讀取昨天報表失敗，請檢查檔案是否損毀 (詳細錯誤請看 Console)');
+    }
 }
 
 async function handleTodayFile(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+    try {
+        const file = e.target.files[0];
+        if (!file) return;
 
-    document.getElementById('todayFileName').textContent = file.name;
-    document.getElementById('todayBox').classList.add('has-file');
+        console.log('開始讀取今天報表:', file.name);
+        document.getElementById('todayFileName').textContent = file.name;
+        document.getElementById('todayBox').classList.add('has-file');
 
-    // 儲存原始檔案的完整副本（用於 JSZip 輸出）
-    const arrayBuffer = await file.arrayBuffer();
-    todayFileBuffer = new Uint8Array(arrayBuffer);
+        // 儲存原始檔案的完整副本（用於 JSZip 輸出）
+        const arrayBuffer = await file.arrayBuffer();
+        todayFileBuffer = new Uint8Array(arrayBuffer);
 
-    // 讀取給 ExcelJS 使用（需要另一個副本，因為 ExcelJS 可能會修改 buffer）
-    todayWorkbook = new ExcelJS.Workbook();
-    await todayWorkbook.xlsx.load(arrayBuffer.slice(0));
+        // 讀取給 ExcelJS 使用（需要另一個副本，因為 ExcelJS 可能會修改 buffer）
+        todayWorkbook = new ExcelJS.Workbook();
+        await todayWorkbook.xlsx.load(arrayBuffer.slice(0));
 
-    console.log('今天報表已載入:', todayWorkbook.worksheets.map(ws => ws.name));
-    checkReadyToTransfer();
+        console.log('今天報表已載入:', todayWorkbook.worksheets.map(ws => ws.name));
+        checkReadyToTransfer();
+    } catch (error) {
+        console.error('讀取今天報表失敗:', error);
+        alert('讀取今天報表失敗，請檢查檔案是否損毀 (詳細錯誤請看 Console)');
+    }
 }
 
 function checkReadyToTransfer() {
     const transferBtn = document.getElementById('transferBtn');
-    transferBtn.disabled = !(yesterdayWorkbook && todayWorkbook);
+    const ready = !!(yesterdayWorkbook && todayWorkbook);
+    transferBtn.disabled = !ready;
+    console.log(`檢查轉移狀態: 昨天=${!!yesterdayWorkbook}, 今天=${!!todayWorkbook} => 按鈕${ready ? '啟用' : '停用'}`);
 }
 
 function colLetterToNumber(letter) {
@@ -396,94 +410,99 @@ async function downloadResult() {
     const sheetPath = 'xl/worksheets/sheet1.xml';
     let sheetXml = await zip.file(sheetPath).async('string');
 
-    if (value === null || value === undefined) {
-        console.log(`儲存格 ${cellRef} 值為 null/undefined，跳過更新`);
-        return;
-    }
+    // 將 transferResults 中的數據寫入 XML
+    transferResults.forEach(result => {
+        const cellRef = result.targetCol + result.targetRow;
+        const value = result.value;
 
-    // --- 核心修正：避免 Shared String 衝突 ---
-    // 我們要寫入的是數值（<v>123</v>），但如果原儲存格有 t="s"（共享字串），
-    // 必須把 t="s" 屬性移除，否則 Excel 會把數值當作字串索引而崩潰
-
-    // 1. 已有值的儲存格
-    const cellWithValuePattern = new RegExp(
-        `(<c r="${cellRef}"[^>]*)( t="[^"]*")?([^>]*>)(.*?)(<v>[^<]*</v>)(.*?)(</c>)`
-    );
-    if (sheetXml.match(cellWithValuePattern)) {
-        // $1: <c r="G5" s="1"
-        // $2: t="s" (可能存在) -> 我們不放回這個
-        // $3: >
-        // $5: <v>old</v> -> 換成 <v>new</v>
-        sheetXml = sheetXml.replace(cellWithValuePattern, `$1$3<v>${value}</v>$6$7`);
-        console.log(`更新儲存格 ${cellRef} 的值為 ${value}`);
-        return;
-    }
-
-    // 2. 空儲存格：<c r="G5" .../>
-    const emptyCellPattern = new RegExp(`<c r="${cellRef}"([^/>]*)( t="[^"]*")?([^/>]*)/>`);
-    if (sheetXml.match(emptyCellPattern)) {
-        // 移除可能存在的 t 屬性，並展開為 <c ...><v>...</v></c>
-        sheetXml = sheetXml.replace(emptyCellPattern, `<c r="${cellRef}"$1$3><v>${value}</v></c>`);
-        console.log(`填入空儲存格 ${cellRef} 值為 ${value}`);
-        return;
-    }
-
-    // 3. 空內容儲存格：<c r="G5" ...></c>
-    const emptyContentCellPattern = new RegExp(`(<c r="${cellRef}"[^>]*)( t="[^"]*")?([^>]*>)(</c>)`);
-    if (sheetXml.match(emptyContentCellPattern)) {
-        sheetXml = sheetXml.replace(emptyContentCellPattern, `$1$3<v>${value}</v>$4`);
-        console.log(`填入空內容儲存格 ${cellRef} 值為 ${value}`);
-        return;
-    }
-
-    // 4. 含公式的儲存格
-    const formulaCellPattern = new RegExp(
-        `(<c r="${cellRef}"[^>]*)( t="[^"]*")?([^>]*>)(<f>[^<]*</f>)(<v>[^<]*</v>)?(</c>)`
-    );
-    if (sheetXml.match(formulaCellPattern)) {
-        // 移除 t 屬性，並更新公式計算結果
-        sheetXml = sheetXml.replace(formulaCellPattern, `$1$3$4<v>${value}</v>$6`);
-        console.log(`更新公式儲存格 ${cellRef} 的值為 ${value}`);
-        return;
-    }
-
-    console.log(`儲存格 ${cellRef} 在 XML 中未找到匹配模式`);
-});
-
-// 寫回 ZIP
-zip.file(sheetPath, sheetXml);
-
-/* 
-注意：不刪除 calcChain.xml，因為如果只從 Content_Types 移除但沒更新被參照的關係檔，
-會導致 Excel 報錯。保留它讓 Excel 自動修復比較安全。
-*/
-
-// 設定 fullCalcOnLoad 強制重新計算
-const workbookPath = 'xl/workbook.xml';
-if (zip.file(workbookPath)) {
-    let workbookXml = await zip.file(workbookPath).async('string');
-    if (!workbookXml.includes('fullCalcOnLoad')) {
-        if (workbookXml.includes('<calcPr')) {
-            workbookXml = workbookXml.replace(
-                /<calcPr([^>]*)\/>/,
-                '<calcPr$1 fullCalcOnLoad="1"/>'
-            );
-            workbookXml = workbookXml.replace(
-                /<calcPr([^>]*)>/,
-                '<calcPr$1 fullCalcOnLoad="1">'
-            );
+        if (value === null || value === undefined) {
+            console.log(`儲存格 ${cellRef} 值為 null/undefined，跳過更新`);
+            return;
         }
-        zip.file(workbookPath, workbookXml);
-    }
-}
 
-// 生成檔案
-const content = await zip.generateAsync({ type: 'blob' });
-const url = URL.createObjectURL(content);
-const a = document.createElement('a');
-a.href = url;
-const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
-a.download = `生產統計表_庫存已轉移_${today}.xlsm`;
-a.click();
-URL.revokeObjectURL(url);
+        // --- 核心修正：避免 Shared String 衝突 ---
+        // 我們要寫入的是數值（<v>123</v>），但如果原儲存格有 t="s"（共享字串），
+        // 必須把 t="s" 屬性移除，否則 Excel 會把數值當作字串索引而崩潰
+
+        // 1. 已有值的儲存格
+        const cellWithValuePattern = new RegExp(
+            `(<c r="${cellRef}"[^>]*)( t="[^"]*")?([^>]*>)(.*?)(<v>[^<]*</v>)(.*?)(</c>)`
+        );
+        if (sheetXml.match(cellWithValuePattern)) {
+            // $1: <c r="G5" s="1"
+            // $2: t="s" (可能存在) -> 我們不放回這個
+            // $3: >
+            // $5: <v>old</v> -> 換成 <v>new</v>
+            sheetXml = sheetXml.replace(cellWithValuePattern, `$1$3<v>${value}</v>$6$7`);
+            console.log(`更新儲存格 ${cellRef} 的值為 ${value}`);
+            return;
+        }
+
+        // 2. 空儲存格：<c r="G5" .../>
+        const emptyCellPattern = new RegExp(`<c r="${cellRef}"([^/>]*)( t="[^"]*")?([^/>]*)/>`);
+        if (sheetXml.match(emptyCellPattern)) {
+            // 移除可能存在的 t 屬性，並展開為 <c ...><v>...</v></c>
+            sheetXml = sheetXml.replace(emptyCellPattern, `<c r="${cellRef}"$1$3><v>${value}</v></c>`);
+            console.log(`填入空儲存格 ${cellRef} 值為 ${value}`);
+            return;
+        }
+
+        // 3. 空內容儲存格：<c r="G5" ...></c>
+        const emptyContentCellPattern = new RegExp(`(<c r="${cellRef}"[^>]*)( t="[^"]*")?([^>]*>)(</c>)`);
+        if (sheetXml.match(emptyContentCellPattern)) {
+            sheetXml = sheetXml.replace(emptyContentCellPattern, `$1$3<v>${value}</v>$4`);
+            console.log(`填入空內容儲存格 ${cellRef} 值為 ${value}`);
+            return;
+        }
+
+        // 4. 含公式的儲存格
+        const formulaCellPattern = new RegExp(
+            `(<c r="${cellRef}"[^>]*)( t="[^"]*")?([^>]*>)(<f>[^<]*</f>)(<v>[^<]*</v>)?(</c>)`
+        );
+        if (sheetXml.match(formulaCellPattern)) {
+            // 移除 t 屬性，並更新公式計算結果
+            sheetXml = sheetXml.replace(formulaCellPattern, `$1$3$4<v>${value}</v>$6`);
+            console.log(`更新公式儲存格 ${cellRef} 的值為 ${value}`);
+            return;
+        }
+
+        console.log(`儲存格 ${cellRef} 在 XML 中未找到匹配模式`);
+    });
+
+    // 寫回 ZIP
+    zip.file(sheetPath, sheetXml);
+
+    /* 
+    注意：不刪除 calcChain.xml，因為如果只從 Content_Types 移除但沒更新被參照的關係檔，
+    會導致 Excel 報錯。保留它讓 Excel 自動修復比較安全。
+    */
+
+    // 設定 fullCalcOnLoad 強制重新計算
+    const workbookPath = 'xl/workbook.xml';
+    if (zip.file(workbookPath)) {
+        let workbookXml = await zip.file(workbookPath).async('string');
+        if (!workbookXml.includes('fullCalcOnLoad')) {
+            if (workbookXml.includes('<calcPr')) {
+                workbookXml = workbookXml.replace(
+                    /<calcPr([^>]*)\/>/,
+                    '<calcPr$1 fullCalcOnLoad="1"/>'
+                );
+                workbookXml = workbookXml.replace(
+                    /<calcPr([^>]*)>/,
+                    '<calcPr$1 fullCalcOnLoad="1">'
+                );
+            }
+            zip.file(workbookPath, workbookXml);
+        }
+    }
+
+    // 生成檔案
+    const content = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(content);
+    const a = document.createElement('a');
+    a.href = url;
+    const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    a.download = `生產統計表_庫存已轉移_${today}.xlsm`;
+    a.click();
+    URL.revokeObjectURL(url);
 }
