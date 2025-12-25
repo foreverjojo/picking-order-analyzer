@@ -16,34 +16,69 @@
             margin-bottom: 30px;
         }
 
-        .upload-box {
+        .upload-box-wrapper {
             flex: 1;
             min-width: 280px;
+        }
+
+        .upload-box-wrapper h3 {
+            margin-bottom: 10px;
+            color: var(--primary-color);
+            font-size: 1.1em;
+        }
+
+        .upload-box {
             background: var(--bg-secondary);
             border: 2px dashed var(--border-color);
             border-radius: 12px;
-            padding: 20px;
+            padding: 40px 20px;
             text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-box:hover {
+            border-color: var(--primary-color);
+            background: rgba(var(--primary-rgb), 0.05);
         }
 
         .upload-box.has-file {
             border-color: var(--success-color);
             border-style: solid;
+            background: rgba(40, 167, 69, 0.05);
         }
 
-        .upload-box h3 {
-            margin-bottom: 10px;
-            color: var(--primary-color);
+        .upload-box.dragover {
+            border-color: var(--primary-color);
+            background: rgba(var(--primary-rgb), 0.1);
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .upload-hint {
+            font-size: 0.85em;
+            color: var(--text-secondary);
         }
 
         .upload-box input[type="file"] {
-            margin-top: 10px;
+            display: none;
         }
 
         .file-name {
             margin-top: 10px;
             font-size: 0.9em;
-            color: var(--text-secondary);
+            color: var(--success-color);
+            font-weight: 500;
         }
 
         .preview-table {
@@ -111,69 +146,85 @@
 </head>
 
 <body>
-    <header class="header">
-        <div class="header-content">
-            <a href="index.html" class="back-link">← 返回首頁</a>
-            <div class="brand">
-                <h1 class="brand-name">IVY FOODIE PALACE</h1>
-                <p class="brand-tagline">庫存轉移工具</p>
-            </div>
+    <div class="container">
+        <div style="margin-bottom: 20px;">
+            <a href="index.html" class="btn btn-secondary" style="text-decoration: none;">← 回首頁</a>
         </div>
-    </header>
+        <header>
+            <h1>📦 庫存轉移工具</h1>
+            <p class="subtitle">IVY FOODIE PALACE - 自動化庫存轉移</p>
+        </header>
 
-    <main class="main-content">
-        <div class="card">
-            <h2>📦 庫存數據轉移</h2>
-            <p>將昨天報表的庫存數據自動填入今天的報表範本</p>
+        <main>
+            <!-- Step 1: 檔案上傳 -->
+            <section class="step-section" id="step1">
+                <div class="step-header">
+                    <h2>📤 上傳報表</h2>
+                </div>
+                <p style="margin-bottom: 20px; color: var(--text-secondary);">將本日報表的庫存數據自動填入報表原始檔</p>
 
-            <div class="upload-section">
-                <div class="upload-box" id="yesterdayBox">
-                    <h3>📄 昨天的報表</h3>
-                    <p>選擇昨天的生產統計表</p>
-                    <input type="file" id="yesterdayFile" accept=".xlsx,.xlsm">
-                    <div class="file-name" id="yesterdayFileName"></div>
+                <div class="upload-section">
+                    <div class="upload-box-wrapper">
+                        <h3>📄 本日報表</h3>
+                        <div class="upload-box" id="yesterdayBox">
+                            <div class="upload-icon">📊</div>
+                            <p class="upload-text">拖放本日報表到這裡或點擊選擇檔案</p>
+                            <p class="upload-hint">支援 .xlsx, .xlsm 格式</p>
+                            <input type="file" id="yesterdayFile" accept=".xlsx,.xlsm">
+                            <div class="file-name" id="yesterdayFileName"></div>
+                        </div>
+                    </div>
+
+                    <div class="upload-box-wrapper">
+                        <h3>📄 報表原始檔</h3>
+                        <div class="upload-box" id="todayBox">
+                            <div class="upload-icon">📋</div>
+                            <p class="upload-text">拖放報表原始檔到這裡或點擊選擇檔案</p>
+                            <p class="upload-hint">支援 .xlsx, .xlsm 格式</p>
+                            <input type="file" id="todayFile" accept=".xlsx,.xlsm">
+                            <div class="file-name" id="todayFileName"></div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="upload-box" id="todayBox">
-                    <h3>📄 今天的報表範本</h3>
-                    <p>選擇今天要填入的報表</p>
-                    <input type="file" id="todayFile" accept=".xlsx,.xlsm">
-                    <div class="file-name" id="todayFileName"></div>
+                <button class="btn btn-primary" id="transferBtn" disabled>
+                    <span>🔄 開始轉移庫存</span>
+                </button>
+            </section>
+
+            <!-- 結果區域 -->
+            <section class="step-section" id="resultCard" style="display: none;">
+                <div class="step-header">
+                    <h2>📊 轉移結果</h2>
                 </div>
-            </div>
 
-            <div class="action-buttons">
-                <button class="btn btn-primary" id="transferBtn" disabled>開始轉移庫存</button>
-            </div>
-        </div>
-
-        <div class="card" id="resultCard" style="display: none;">
-            <h2>📊 轉移結果</h2>
-
-            <div class="stats-box" id="statsBox">
-                <div class="stat-item">
-                    <div class="stat-value" id="totalMatched">0</div>
-                    <div class="stat-label">成功匹配</div>
+                <div class="stats-box" id="statsBox">
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalMatched">0</div>
+                        <div class="stat-label">成功匹配</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalUnmatched">0</div>
+                        <div class="stat-label">未匹配</div>
+                    </div>
                 </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="totalUnmatched">0</div>
-                    <div class="stat-label">未匹配</div>
-                </div>
-            </div>
 
-            <div id="previewContainer"></div>
+                <div id="previewContainer"></div>
 
-            <div class="action-buttons">
-                <button class="btn btn-primary" id="downloadBtn">下載更新後的報表</button>
-            </div>
-        </div>
-    </main>
+                <button class="btn btn-primary" id="downloadBtn">
+                    <span>💾 下載更新後的報表</span>
+                </button>
+            </section>
+        </main>
 
-    <footer class="footer">
-        <p>© 2024 IVY FOODIE PALACE. All rights reserved.</p>
-    </footer>
+        <footer>
+            <p>© 2024 IVY FOODIE PALACE - 庫存轉移工具</p>
+        </footer>
+    </div>
 
     <script src="inventory-transfer.js"></script>
 </body>
 
 </html>
+</CodeContent>
+<parameter name="Complexity">4

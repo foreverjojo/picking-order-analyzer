@@ -126,14 +126,87 @@ let transferResults = [];
 document.addEventListener('DOMContentLoaded', () => {
     const yesterdayFileInput = document.getElementById('yesterdayFile');
     const todayFileInput = document.getElementById('todayFile');
+    const yesterdayBox = document.getElementById('yesterdayBox');
+    const todayBox = document.getElementById('todayBox');
     const transferBtn = document.getElementById('transferBtn');
     const downloadBtn = document.getElementById('downloadBtn');
 
+    // 檔案輸入事件
     yesterdayFileInput.addEventListener('change', handleYesterdayFile);
     todayFileInput.addEventListener('change', handleTodayFile);
     transferBtn.addEventListener('click', performTransfer);
     downloadBtn.addEventListener('click', downloadResult);
+
+    // 點擊上傳區域觸發檔案選擇
+    yesterdayBox.addEventListener('click', () => yesterdayFileInput.click());
+    todayBox.addEventListener('click', () => todayFileInput.click());
+
+    // 拖放功能 - 本日報表
+    setupDragDrop(yesterdayBox, async (file) => {
+        console.log('開始讀取本日報表:', file.name);
+        document.getElementById('yesterdayFileName').textContent = file.name;
+        yesterdayBox.classList.add('has-file');
+
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            yesterdayWorkbook = new ExcelJS.Workbook();
+            await yesterdayWorkbook.xlsx.load(arrayBuffer);
+            console.log('本日報表已載入:', yesterdayWorkbook.worksheets.map(ws => ws.name));
+            checkReadyToTransfer();
+        } catch (error) {
+            console.error('讀取本日報表失敗:', error);
+            alert('讀取本日報表失敗，請檢查檔案是否損毀');
+        }
+    });
+
+    // 拖放功能 - 報表原始檔
+    setupDragDrop(todayBox, async (file) => {
+        console.log('開始讀取報表原始檔:', file.name);
+        document.getElementById('todayFileName').textContent = file.name;
+        todayBox.classList.add('has-file');
+
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            todayFileBuffer = new Uint8Array(arrayBuffer);
+            todayWorkbook = new ExcelJS.Workbook();
+            await todayWorkbook.xlsx.load(arrayBuffer.slice(0));
+            console.log('報表原始檔已載入:', todayWorkbook.worksheets.map(ws => ws.name));
+            checkReadyToTransfer();
+        } catch (error) {
+            console.error('讀取報表原始檔失敗:', error);
+            alert('讀取報表原始檔失敗，請檢查檔案是否損毀');
+        }
+    });
 });
+
+// 設置拖放功能
+function setupDragDrop(element, onFile) {
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        element.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        element.addEventListener(eventName, () => {
+            element.classList.add('dragover');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        element.addEventListener(eventName, () => {
+            element.classList.remove('dragover');
+        });
+    });
+
+    element.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            onFile(files[0]);
+        }
+    });
+}
 
 async function handleYesterdayFile(e) {
     try {
