@@ -571,10 +571,13 @@ async function downloadResult() {
 
         let sheetXml = await zip.file(sheetPath).async('string');
 
-        // 將 transferResults 中的數據寫入 XML
+        // 將 transferResults 中的數據寫入 XML (只處理工作表 1 的映射)
         let updatedCount = 0;
 
-        transferResults.forEach(result => {
+        // 過濾出工作表 1 的結果（排除 type='直接映射' 的工作表 2 項目）
+        const sheet1Results = transferResults.filter(r => r.type !== '直接映射');
+
+        sheet1Results.forEach(result => {
             const cellRef = result.targetCol + result.targetRow;
             const value = result.value;
 
