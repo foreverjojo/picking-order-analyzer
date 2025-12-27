@@ -750,11 +750,13 @@ async function downloadResult() {
             zip.file(sheet2Path, sheet2Xml);
         }
 
-        // --- 修正策略：不移除 calcChain 或修改 _rels ---
-        // 之前的嘗試顯示修改 _rels/workbook.xml.rels 可能導致 Excel 找不到其他工作表 (如 Sheet 3 消失)
-        // 由於我們只修改了 Sheet 1 的儲存格數值 (且移除了 shared string 依賴)，
-        // Excel 應該能自動偵測並在開啟時重新計算，頂多跳出輕微的修復警告，而不會掉資料。
-        // 這是目前最安全的做法。
+        // === 強制 Excel 重新計算公式 ===
+        // 刪除 calcChain.xml 會強制 Excel 在開啟時重建公式依賴鏈並重新計算
+        const calcChainPath = 'xl/calcChain.xml';
+        if (zip.file(calcChainPath)) {
+            zip.remove(calcChainPath);
+            console.log('已刪除 calcChain.xml，Excel 將在開啟時重新計算公式');
+        }
 
         // 生成檔案
         const content = await zip.generateAsync({ type: 'blob' });
