@@ -524,6 +524,53 @@ async function performTransfer() {
         console.log('今天報表沒有工作表 2，跳過直接映射');
     }
 
+    // === 工作表 2 D 欄到工作表 1 N 欄的跨工作表映射 ===
+    // 本日報表工作表 2 的 D 欄 -> 報表原始檔工作表 1 的 N 欄
+    console.log('=== 工作表 2 D欄 -> 工作表 1 N欄 跨表映射 ===');
+    const crossSheetMappings = [
+        // 瓦片類
+        { sourceRow: 48, targetRow: 12 },  // D48 -> N12
+        { sourceRow: 49, targetRow: 13 },  // D49 -> N13
+        { sourceRow: 50, targetRow: 14 },  // D50 -> N14
+        { sourceRow: 51, targetRow: 22 },  // D51 -> N22
+        { sourceRow: 52, targetRow: 23 },  // D52 -> N23
+        { sourceRow: 53, targetRow: 24 },  // D53 -> N24
+        { sourceRow: 54, targetRow: 25 },  // D54 -> N25
+        // 奶油餅乾
+        { sourceRow: 57, targetRow: 15 },  // D57 -> N15
+        { sourceRow: 58, targetRow: 16 },  // D58 -> N16
+        { sourceRow: 59, targetRow: 17 },  // D59 -> N17
+        { sourceRow: 60, targetRow: 26 },  // D60 -> N26
+        { sourceRow: 61, targetRow: 27 },  // D61 -> N27
+        // 西餅餅乾
+        { sourceRow: 64, targetRow: 18 },  // D64 -> N18
+        { sourceRow: 65, targetRow: 19 },  // D65 -> N19
+        { sourceRow: 66, targetRow: 20 },  // D66 -> N20
+        { sourceRow: 67, targetRow: 28 },  // D67 -> N28
+        { sourceRow: 68, targetRow: 29 },  // D68 -> N29
+    ];
+
+    crossSheetMappings.forEach(mapping => {
+        const sourceValue = getCellValue(sheet2.getRow(mapping.sourceRow).getCell(4)); // D 欄 = 第 4 欄
+        if (sourceValue !== null && sourceValue !== undefined) {
+            // 寫入工作表 1 的 N 欄
+            sheet1.getRow(mapping.targetRow).getCell(14).value = sourceValue; // N 欄 = 第 14 欄
+
+            transferResults.push({
+                sourceName: `工作表2 D${mapping.sourceRow}`,
+                targetName: `工作表1 N${mapping.targetRow}`,
+                targetRow: mapping.targetRow,
+                targetCol: 'N',
+                value: sourceValue,
+                type: '跨表映射',
+                matched: true
+            });
+
+            console.log(`[跨表] D${mapping.sourceRow} -> N${mapping.targetRow}: ${sourceValue}`);
+        }
+    });
+    console.log('=========================');
+
     // 顯示結果
     showResults();
 }
