@@ -755,7 +755,37 @@ async function downloadResult() {
         const calcChainPath = 'xl/calcChain.xml';
         if (zip.file(calcChainPath)) {
             zip.remove(calcChainPath);
-            console.log('已刪除 calcChain.xml，Excel 將在開啟時重新計算公式');
+            console.log('已刪除 calcChain.xml');
+        }
+
+        // 修改 workbook.xml 設置 fullCalcOnLoad="1" 強制開啟時重新計算
+        const workbookPath = 'xl/workbook.xml';
+        if (zip.file(workbookPath)) {
+            let workbookXml = await zip.file(workbookPath).async('string');
+
+            // 檢查是否已有 calcPr 標籤
+            if (workbookXml.includes('<calcPr')) {
+                // 更新現有的 calcPr 標籤，加入 fullCalcOnLoad="1"
+                workbookXml = workbookXml.replace(
+                    /<calcPr([^>]*)>/,
+                    (match, attrs) => {
+                        if (attrs.includes('fullCalcOnLoad')) {
+                            return match.replace(/fullCalcOnLoad="[^"]*"/, 'fullCalcOnLoad="1"');
+                        } else {
+                            return `<calcPr${attrs} fullCalcOnLoad="1">`;
+                        }
+                    }
+                );
+            } else {
+                // 如果沒有 calcPr，在 </workbook> 前插入
+                workbookXml = workbookXml.replace(
+                    '</workbook>',
+                    '<calcPr fullCalcOnLoad="1"/></workbook>'
+                );
+            }
+
+            zip.file(workbookPath, workbookXml);
+            console.log('已設置 fullCalcOnLoad="1"，Excel 將在開啟時重新計算所有公式');
         }
 
         // 生成檔案
