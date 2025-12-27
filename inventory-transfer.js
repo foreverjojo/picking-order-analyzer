@@ -751,42 +751,36 @@ async function downloadResult() {
         }
 
         // === 強制 Excel 重新計算公式 ===
-        // 刪除 calcChain.xml 會強制 Excel 在開啟時重建公式依賴鏈並重新計算
+        // 1. 刪除 calcChain.xml
         const calcChainPath = 'xl/calcChain.xml';
         if (zip.file(calcChainPath)) {
             zip.remove(calcChainPath);
             console.log('已刪除 calcChain.xml');
+
+            // 2. 從 [Content_Types].xml 中移除對 calcChain 的引用
+            const contentTypesPath = '[Content_Types].xml';
+            let contentTypesXml = await zip.file(contentTypesPath).async('string');
+            contentTypesXml = contentTypesXml.replace(/<Override[^>]*calcChain[^>]*\/>/g, '');
+            zip.file(contentTypesPath, contentTypesXml);
+            console.log('已從 Content_Types.xml 移除 calcChain 引用');
         }
 
-        // 修改 workbook.xml 設置 fullCalcOnLoad="1" 強制開啟時重新計算
+        // 3. 設定 workbook.xml 強制開啟時重新計算公式
         const workbookPath = 'xl/workbook.xml';
-        if (zip.file(workbookPath)) {
-            let workbookXml = await zip.file(workbookPath).async('string');
+        let workbookXml = await zip.file(workbookPath).async('string');
 
-            // 檢查是否已有 calcPr 標籤
-            if (workbookXml.includes('<calcPr')) {
-                // 更新現有的 calcPr 標籤，加入 fullCalcOnLoad="1"
-                workbookXml = workbookXml.replace(
-                    /<calcPr([^>]*)>/,
-                    (match, attrs) => {
-                        if (attrs.includes('fullCalcOnLoad')) {
-                            return match.replace(/fullCalcOnLoad="[^"]*"/, 'fullCalcOnLoad="1"');
-                        } else {
-                            return `<calcPr${attrs} fullCalcOnLoad="1">`;
-                        }
-                    }
-                );
-            } else {
-                // 如果沒有 calcPr，在 </workbook> 前插入
-                workbookXml = workbookXml.replace(
-                    '</workbook>',
-                    '<calcPr fullCalcOnLoad="1"/></workbook>'
-                );
-            }
-
-            zip.file(workbookPath, workbookXml);
-            console.log('已設置 fullCalcOnLoad="1"，Excel 將在開啟時重新計算所有公式');
+        // 檢查是否已有 calcPr 元素
+        if (workbookXml.includes('<calcPr')) {
+            // 如果已有 fullCalcOnLoad，先移除它
+            workbookXml = workbookXml.replace(/fullCalcOnLoad="[^"]*"/g, '');
+            // 在 calcPr 開頭加入 fullCalcOnLoad="1"
+            workbookXml = workbookXml.replace(/<calcPr\s*/g, '<calcPr fullCalcOnLoad="1" ');
+        } else {
+            // 在 </workbook> 前插入 calcPr
+            workbookXml = workbookXml.replace('</workbook>', '<calcPr fullCalcOnLoad="1"/></workbook>');
         }
+        zip.file(workbookPath, workbookXml);
+        console.log('已設定公式在開啟時自動重新計算');
 
         // 生成檔案
         const content = await zip.generateAsync({ type: 'blob' });
