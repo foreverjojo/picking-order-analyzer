@@ -1455,8 +1455,49 @@ function skipToStep3() {
     // 收集對應資料
     collectMappingFromTable();
 
-    // 整合商品統計
-    consolidateProducts();
+    // 建立統計資料（與 confirmMapping 相同邏輯）
+    productMapping = {};
+    statistics = {};
+
+    mappedProducts.forEach((product, index) => {
+        const nameSelect = document.getElementById(`mapped-name-${index}`);
+        const columnSelect = document.getElementById(`mapped-column-${index}`);
+        const specSelect = document.getElementById(`mapped-spec-${index}`);
+
+        const mappedName = nameSelect ? nameSelect.value.trim() : product.templateProduct;
+        const column = columnSelect ? columnSelect.value : product.templateColumn;
+        const spec = specSelect ? specSelect.value : product.templateSpec;
+
+        if (!mappedName) {
+            return;
+        }
+
+        // 更新 mappedProducts 中的對應資訊
+        product.templateProduct = mappedName;
+        product.templateColumn = column;
+        product.templateSpec = spec;
+
+        productMapping[product.name] = {
+            reportName: mappedName,
+            column: column,
+            spec: spec
+        };
+
+        // 統計數量（按商品名+規格分組）
+        const key = `${mappedName}_${spec || 'default'}`;
+        if (!statistics[key]) {
+            statistics[key] = {
+                name: mappedName,
+                column: column,
+                spec: spec,
+                flavor: product.spec || '',  // 使用原始商品的規格作為口味
+                quantity: 0
+            };
+        }
+        statistics[key].quantity += product.mappedQuantity || product.quantity;
+    });
+
+    console.log('跳過報表 - 統計結果:', statistics);
 
     // 直接顯示步驟 3（不需要上傳報表範本）
     document.getElementById('step2').classList.add('hidden');
