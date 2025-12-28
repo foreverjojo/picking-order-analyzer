@@ -987,6 +987,22 @@ function confirmMapping() {
             document.getElementById('step2').classList.add('hidden');
             document.getElementById('step3').classList.remove('hidden');
 
+            // 啟用兩個按鈕（因為有上傳報表範本）
+            const generateReportBtn = document.getElementById('generateReportBtn');
+            if (generateReportBtn) {
+                generateReportBtn.disabled = false;
+                generateReportBtn.style.opacity = '1';
+                generateReportBtn.style.cursor = 'pointer';
+                generateReportBtn.title = '';
+            }
+
+            const downloadPickingListBtn = document.getElementById('downloadPickingListBtn');
+            if (downloadPickingListBtn) {
+                downloadPickingListBtn.disabled = false;
+                downloadPickingListBtn.style.opacity = '1';
+                downloadPickingListBtn.style.cursor = 'pointer';
+            }
+
             // 顯示統計結果
             displayStatistics();
         } catch (error) {
@@ -1588,6 +1604,23 @@ function skipToStep3() {
     // 直接顯示步驟 3（不需要上傳報表範本）
     document.getElementById('step2').classList.add('hidden');
     document.getElementById('step3').classList.remove('hidden');
+
+    // 停用「下載生產統計表」按鈕（因為沒有上傳報表範本）
+    const generateReportBtn = document.getElementById('generateReportBtn');
+    if (generateReportBtn) {
+        generateReportBtn.disabled = true;
+        generateReportBtn.style.opacity = '0.5';
+        generateReportBtn.style.cursor = 'not-allowed';
+        generateReportBtn.title = '需要先上傳生產統計表範本才能使用此功能';
+    }
+
+    // 確保「下載撿貨單」按鈕可用
+    const downloadPickingListBtn = document.getElementById('downloadPickingListBtn');
+    if (downloadPickingListBtn) {
+        downloadPickingListBtn.disabled = false;
+        downloadPickingListBtn.style.opacity = '1';
+        downloadPickingListBtn.style.cursor = 'pointer';
+    }
 
     displayStatistics();
     showToast('已跳過上傳報表，進入預覽模式', 'success');
