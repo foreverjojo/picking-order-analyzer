@@ -1,3 +1,10 @@
+/**
+ * @file auto-mapping-rules.js
+ * @description 自動映射規則分析模組
+ * @purpose 根據商品名稱與規格，自動推斷對應的報表商品、欄位及規格
+ * @author Ivy House TW Development Team
+ */
+
 // 自動映射規則分析結果
 
 /*

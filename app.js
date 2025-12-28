@@ -1,3 +1,10 @@
+/**
+ * @file app.js
+ * @description 撿貨單分析系統 - 核心應用程式
+ * @purpose 處理多平台訂單 (蝦皮、MOMO、官網等) 的解析、商品映射、統計及報表生成
+ * @author Ivy House TW Development Team
+ */
+
 // 全域變數
 let uploadedFiles = {
     momo: null,

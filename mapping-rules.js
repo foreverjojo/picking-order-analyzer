@@ -1,4 +1,10 @@
-// mapping-rules.js - 智慧商品映射規則
+/**
+ * @file mapping-rules.js
+ * @description 智慧商品映射規則引擎
+ * @purpose 定義撿貨單商品名稱到報表標準名稱的映射規則，支援模糊匹配與欄位/規格判斷
+ * @author Ivy House TW Development Team
+ */
+
 // 從 test-auto-mapping.html 同步的完整映射規則
 
 // 標準報表商品名稱列表

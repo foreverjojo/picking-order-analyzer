@@ -2,33 +2,35 @@
 description: 更新 GitHub - 每次修正 picking-order-analyzer 程式後必須執行
 ---
 
-# 更新 GitHub 流程
 
-每次對 picking-order-analyzer 專案進行修改後，都需要同步更新到 GitHub。
+5. # 更新 GitHub 流程 (符合 Ivy House Rules)
+
+每次對 picking-order-analyzer 專案進行修改後，需遵循以下安全流程同步到 GitHub。
 
 ## 步驟
 
-1. 確認所有變更已儲存
+1. **[關鍵] 本地測試確認**
+   - 請使用者在本地瀏覽器打開頁面測試功能。
+   - 詢問：「請問測試結果是否正常？可以上傳了嗎？」
+   - **只有在使用者確認後，才執行後續步驟。**
 
 2. 將變更加入暫存區
 ```bash
 git add -A
 ```
 
-3. 建立 commit（描述這次的修改內容）
-// turbo
+3. 建立 commit
+   - **注意：** 訊息須遵循 Conventional Commits (如 `feat:`, `fix:`, `docs:`)
 ```bash
-git commit -m "修改描述"
+git commit -m "feat: [描述修改內容]"
 ```
 
-4. 推送到 GitHub
-// turbo
+4. 推送到 GitHub (觸發部署)
 ```bash
 git push origin main
 ```
 
 ## 注意事項
 
-- 如果有 revert 或 reset 操作，可能需要使用 `git push origin main --force`
-- Commit 訊息應該簡潔描述這次修改的內容
-- 確保程式在本地測試正常後再推送
+- **嚴禁**在未經使用者測試前直接 Push。
+- Push 後，提醒使用者 Cloudflare Pages 會自動更新。

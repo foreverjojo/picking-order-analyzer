@@ -1,3 +1,10 @@
+/**
+ * @file inventory-transfer.js
+ * @description 庫存轉移工具 - 核心邏輯
+ * @purpose 將生產統計表的數據從工作表 2 映射並填入工作表 1，實現 Excel 資料自動轉移
+ * @author Ivy House TW Development Team
+ */
+
 // ==================== 庫存轉移工具核心邏輯 ====================
 
 // 工作表 2 產品名稱到工作表 1 產品名稱的映射

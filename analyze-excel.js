@@ -1,3 +1,11 @@
+/**
+ * @file analyze-excel.js
+ * @description Excel 報表結構分析工具 (Node.js 腳本)
+ * @purpose 用於開發階段分析 .xlsm 報表的工作表結構與欄位內容
+ * @author Ivy House TW Development Team
+ * @note 此為開發輔助工具，非前端功能
+ */
+
 // 分析 Excel 報表結構的腳本
 const ExcelJS = require('exceljs');
 
