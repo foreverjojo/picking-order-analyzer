@@ -758,6 +758,18 @@ function buildMappingTable() {
     const tbody = document.getElementById('mappingTableBody');
     tbody.innerHTML = '';
 
+    // 按照商品順序排序 mappedProducts（與步驟 3 相同的排序邏輯）
+    const sortedProducts = [...mappedProducts].sort((a, b) => {
+        const orderA = getProductCategoryOrder(a.templateProduct || '');
+        const orderB = getProductCategoryOrder(b.templateProduct || '');
+        if (orderA !== orderB) return orderA - orderB;
+        return (a.templateProduct || '').localeCompare(b.templateProduct || '', 'zh-TW');
+    });
+
+    // 更新 mappedProducts 的順序（保持同步）
+    mappedProducts.length = 0;
+    mappedProducts.push(...sortedProducts);
+
     mappedProducts.forEach((product, index) => {
         const row = document.createElement('tr');
         const confidence = Math.round((product.confidence || 0) * 100);
@@ -1607,10 +1619,9 @@ async function downloadPickingList() {
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('撿貨單');
 
-        // 設定欄位標題（不包含「欄位」）
+        // 設定欄位標題（不包含「欄位」和「口味」）
         worksheet.columns = [
             { header: '報表商品', key: 'name', width: 30 },
-            { header: '口味', key: 'flavor', width: 15 },
             { header: '規格', key: 'spec', width: 15 },
             { header: '總數量', key: 'quantity', width: 12 }
         ];
@@ -1630,7 +1641,6 @@ async function downloadPickingList() {
         statsArray.forEach(stat => {
             worksheet.addRow({
                 name: stat.name || '',
-                flavor: stat.flavor || '',
                 spec: stat.spec || '',
                 quantity: stat.quantity || 0
             });
