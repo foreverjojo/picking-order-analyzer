@@ -81,9 +81,14 @@
                         </tbody>
                     </table>
                 </div>
-                <button class="btn btn-primary" id="confirmMappingBtn">
-                    <span>✓ 確認對應並上傳生產統計表</span>
-                </button>
+                <div class="action-buttons" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="btn btn-primary" id="confirmMappingBtn">
+                        <span>✓ 確認對應並上傳生產統計表</span>
+                    </button>
+                    <button class="btn btn-secondary" id="skipToStep3Btn">
+                        <span>⏭️ 跳過上傳報表，直接預覽</span>
+                    </button>
+                </div>
                 <input type="file" id="templateInput" accept=".xlsm,.xlsx" hidden>
             </section>
 
@@ -96,9 +101,14 @@
                 <div class="stats-container" id="statsContainer">
                     <!-- Statistics will be displayed here -->
                 </div>
-                <button class="btn btn-primary" id="generateReportBtn">
-                    <span>📊 產生報表</span>
-                </button>
+                <div class="action-buttons" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="btn btn-primary" id="generateReportBtn">
+                        <span>📊 產生報表</span>
+                    </button>
+                    <button class="btn btn-success" id="downloadPickingListBtn">
+                        <span>📋 下載撿貨單 Excel</span>
+                    </button>
+                </div>
             </section>
 
             <!-- Step 4: 下載報表 -->

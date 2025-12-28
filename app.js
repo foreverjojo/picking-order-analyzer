@@ -88,6 +88,16 @@ function initializeEventListeners() {
     generateReportBtn.addEventListener('click', generateReport);
     downloadBtn.addEventListener('click', downloadReport);
     resetBtn.addEventListener('click', resetApplication);
+
+    // 新按鈕事件
+    const skipToStep3Btn = document.getElementById('skipToStep3Btn');
+    const downloadPickingListBtn = document.getElementById('downloadPickingListBtn');
+    if (skipToStep3Btn) {
+        skipToStep3Btn.addEventListener('click', skipToStep3);
+    }
+    if (downloadPickingListBtn) {
+        downloadPickingListBtn.addEventListener('click', downloadPickingList);
+    }
 }
 
 // ==================== 檔案處理 ====================
@@ -949,6 +959,7 @@ function confirmMapping() {
                         name: mappedName,
                         column: column,
                         spec: spec,
+                        flavor: product.spec || '',  // 使用原始商品的規格作為口味
                         quantity: 0
                     };
                 }
@@ -975,17 +986,46 @@ function confirmMapping() {
 }
 
 // ==================== 統計顯示 ====================
+
+// 商品分類排序配置（13 類）
+function getProductCategoryOrder(productName) {
+    const name = productName || '';
+    if (/夏威夷.*塔/.test(name)) return 0;  // 夏威夷豆塔類
+    if (/堅果.*塔|塔.*豆子|塔.*腰果|塔.*杏仁|豆塔/.test(name)) return 1;  // 堅果塔類
+    if (/鳳梨酥|鳳凰酥/.test(name)) return 2;  // 鳳梨酥
+    if (/雪花餅|雪餅/.test(name)) return 3;  // 雪花餅
+    if (/瑪德蓮|馬德蓮/.test(name)) return 4;  // 馬德蓮
+    if (/堅果|夏威夷豆|腰果|杏仁|核桃/.test(name) && !/塔|椰棗/.test(name)) return 5;  // 堅果
+    if (/椰棗/.test(name)) return 6;  // 椰棗
+    if (/糖|牛軋|南棗/.test(name)) return 7;  // 糖果
+    if (/瓦片/.test(name)) return 8;  // 杏仁瓦片
+    if (/奶油|曲奇|焦糖牛奶|法國巧克力|蜂蜜檸檬|伯爵紅茶/.test(name) && !/瑪德蓮/.test(name)) return 9;  // 奶油曲奇餅乾
+    if (/西點|貝殼|小花|酥條/.test(name)) return 10;  // 西點餅乾
+    if (/千層/.test(name)) return 11;  // 千層
+    if (/禮盒/.test(name)) return 12;  // 禮盒組合
+    return 99;  // 未分類
+}
+
 function displayStatistics() {
     const container = document.getElementById('statsContainer');
     container.innerHTML = '';
 
-    // 新的統計格式：statistics 是一個物件，key 是 "商品名_規格"，value 是 { name, column, spec, quantity }
-    const statsArray = Object.values(statistics);
+    // 新的統計格式：statistics 是一個物件，key 是 "商品名_規格"，value 是 { name, column, spec, quantity, flavor }
+    let statsArray = Object.values(statistics);
 
     if (statsArray.length === 0) {
         container.innerHTML = '<p style="text-align: center; color: #f59e0b;">沒有統計資料</p>';
         return;
     }
+
+    // 按分類順序排序
+    statsArray.sort((a, b) => {
+        const orderA = getProductCategoryOrder(a.name);
+        const orderB = getProductCategoryOrder(b.name);
+        if (orderA !== orderB) return orderA - orderB;
+        // 同分類內按名稱排序
+        return (a.name || '').localeCompare(b.name || '', 'zh-TW');
+    });
 
     // 建立表格顯示統計結果
     const table = document.createElement('table');
@@ -994,8 +1034,9 @@ function displayStatistics() {
         <thead>
             <tr>
                 <th>報表商品</th>
-                <th>欄位</th>
+                <th>口味</th>
                 <th>規格</th>
+                <th>欄位</th>
                 <th>總數量</th>
             </tr>
         </thead>
@@ -1003,8 +1044,9 @@ function displayStatistics() {
             ${statsArray.map(stat => `
                 <tr>
                     <td>${stat.name}</td>
-                    <td>${stat.column || '-'}</td>
+                    <td>${stat.flavor || '-'}</td>
                     <td>${stat.spec || '-'}</td>
+                    <td>${stat.column || '-'}</td>
                     <td><strong>${stat.quantity}</strong></td>
                 </tr>
             `).join('')}
@@ -1406,4 +1448,121 @@ function parseOrangePointCell(cellValue) {
     }
 
     return results;
+}
+
+// ==================== 跳過上傳報表直接預覽 ====================
+function skipToStep3() {
+    // 收集對應資料
+    collectMappingFromTable();
+
+    // 整合商品統計
+    consolidateProducts();
+
+    // 直接顯示步驟 3（不需要上傳報表範本）
+    document.getElementById('step2').classList.add('hidden');
+    document.getElementById('step3').classList.remove('hidden');
+
+    displayStatistics();
+    showToast('已跳過上傳報表，進入預覽模式', 'success');
+}
+
+// ==================== 下載撿貨單 Excel ====================
+async function downloadPickingList() {
+    try {
+        showLoading('正在產生撿貨單...');
+
+        // 取得統計資料並排序
+        let statsArray = Object.values(statistics);
+
+        if (statsArray.length === 0) {
+            hideLoading();
+            showToast('沒有統計資料可下載', 'error');
+            return;
+        }
+
+        // 按分類順序排序
+        statsArray.sort((a, b) => {
+            const orderA = getProductCategoryOrder(a.name);
+            const orderB = getProductCategoryOrder(b.name);
+            if (orderA !== orderB) return orderA - orderB;
+            return (a.name || '').localeCompare(b.name || '', 'zh-TW');
+        });
+
+        // 使用 ExcelJS 建立工作簿
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('撿貨單');
+
+        // 設定欄位標題（不包含「欄位」）
+        worksheet.columns = [
+            { header: '報表商品', key: 'name', width: 30 },
+            { header: '口味', key: 'flavor', width: 15 },
+            { header: '規格', key: 'spec', width: 15 },
+            { header: '總數量', key: 'quantity', width: 12 }
+        ];
+
+        // 設定標題列樣式
+        const headerRow = worksheet.getRow(1);
+        headerRow.font = { bold: true, size: 12 };
+        headerRow.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FF4A5568' }
+        };
+        headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
+
+        // 添加資料列
+        statsArray.forEach(stat => {
+            worksheet.addRow({
+                name: stat.name || '',
+                flavor: stat.flavor || '',
+                spec: stat.spec || '',
+                quantity: stat.quantity || 0
+            });
+        });
+
+        // 添加總計列
+        const totalRow = worksheet.addRow({
+            name: '總計',
+            flavor: '',
+            spec: `${statsArray.length} 種商品`,
+            quantity: statsArray.reduce((sum, s) => sum + s.quantity, 0)
+        });
+        totalRow.font = { bold: true };
+        totalRow.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFEDF2F7' }
+        };
+
+        // 設定邊框
+        worksheet.eachRow((row, rowNumber) => {
+            row.eachCell((cell) => {
+                cell.border = {
+                    top: { style: 'thin' },
+                    left: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+            });
+        });
+
+        // 產生檔案並下載
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+        a.download = `撿貨單_${today}.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        hideLoading();
+        showToast('撿貨單下載完成！', 'success');
+    } catch (error) {
+        hideLoading();
+        console.error('下載撿貨單失敗:', error);
+        showToast('下載失敗：' + error.message, 'error');
+    }
 }
