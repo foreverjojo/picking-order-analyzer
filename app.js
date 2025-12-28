@@ -993,6 +993,7 @@ function confirmMapping() {
                 generateReportBtn.disabled = false;
                 generateReportBtn.style.opacity = '1';
                 generateReportBtn.style.cursor = 'pointer';
+                generateReportBtn.style.pointerEvents = 'auto';
                 generateReportBtn.title = '';
             }
 
@@ -1607,11 +1608,14 @@ function skipToStep3() {
 
     // 停用「下載生產統計表」按鈕（因為沒有上傳報表範本）
     const generateReportBtn = document.getElementById('generateReportBtn');
+    console.log('generateReportBtn 元素:', generateReportBtn);
     if (generateReportBtn) {
         generateReportBtn.disabled = true;
         generateReportBtn.style.opacity = '0.5';
         generateReportBtn.style.cursor = 'not-allowed';
+        generateReportBtn.style.pointerEvents = 'none';
         generateReportBtn.title = '需要先上傳生產統計表範本才能使用此功能';
+        console.log('已停用「下載生產統計表」按鈕');
     }
 
     // 確保「下載撿貨單」按鈕可用
