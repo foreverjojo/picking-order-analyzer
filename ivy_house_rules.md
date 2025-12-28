@@ -30,7 +30,7 @@
 - **Commit 訊息：** 遵循 Conventional Commits (如 `feat: 新增功能`, `fix: 修復問題`, `refactor: 重構`).
 
 ## 4. 開發技術規範
-- **模組化路由：** 程式碼須按功能拆分 (如 `/modules/parsers/`, `/modules/core/`)，禁止單一大檔。
+- **模組化路由：** 程式碼須按功能拆分 (如 `/modules/parsers/`, `/modules/core/`)，**建議控制在 300 行以內，嚴禁超過 500 行**。
 - **檔案註釋：** 每個檔案第一行必須說明該檔案用途、職責。
 - **前端規範：**
     - **視覺風格：** 嚴格遵循「IVY FOODIE PALACE」品牌色系 (Cream, Ivy Green, Gold)。
