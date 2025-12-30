@@ -226,25 +226,28 @@ export function autoMapProductMomo(pickingName, pickingSpec, quantity) {
         confidence = 0.9;
     }
 
-    // === 規格提取 ===
+    // === 規格提取 (優先順序：specNoSpace > nameNoSpace) ===
     if (!column) {
-        if (/300g/.test(fullTextNoSpace)) { column = 'B'; spec = '300g'; confidence = 0.9; }
-        else if (/280g/.test(fullTextNoSpace)) { column = 'C'; spec = '280g'; confidence = 0.9; }
-        else if (/200g/.test(fullTextNoSpace)) { column = 'C'; spec = '200g'; confidence = 0.9; }
-        else if (/150g/.test(fullTextNoSpace)) { column = 'B'; spec = '150g'; confidence = 0.9; }
-        else if (/135g/.test(fullTextNoSpace)) { column = 'C'; spec = '135g'; confidence = 0.9; }
-        else if (/120g/.test(fullTextNoSpace)) { column = 'B'; spec = '120g'; confidence = 0.9; }
-        else if (/90g/.test(fullTextNoSpace)) { column = 'B'; spec = '90g'; confidence = 0.9; }
-        else if (/50g/.test(fullTextNoSpace) && !/150g/.test(fullTextNoSpace)) { column = 'B'; spec = '50g'; confidence = 0.9; }
-        else if (/45g/.test(fullTextNoSpace)) { column = 'B'; spec = '45g'; confidence = 0.9; }
-        else if (/10入/.test(specNoSpace)) { column = 'B'; spec = '10入袋裝'; confidence = 0.9; }
-        else if (/15入/.test(specNoSpace)) { column = 'C'; spec = '15入袋裝'; confidence = 0.9; }
-        else if (/12入/.test(specNoSpace)) { column = 'C'; spec = '12入袋裝'; confidence = 0.9; }
-        else if (/8入/.test(specNoSpace)) { column = 'B'; spec = '8入袋裝'; confidence = 0.9; }
-        else if (/10入/.test(fullTextNoSpace) && !/15入/.test(fullTextNoSpace)) { column = 'B'; spec = '10入袋裝'; confidence = 0.85; }
-        else if (/15入/.test(fullTextNoSpace)) { column = 'C'; spec = '15入袋裝'; confidence = 0.85; }
-        else if (/12入/.test(fullTextNoSpace)) { column = 'C'; spec = '12入袋裝'; confidence = 0.85; }
-        else if (/8入/.test(fullTextNoSpace)) { column = 'B'; spec = '8入袋裝'; confidence = 0.85; }
+        // 先檢查來源規格是否包含有效的規格資訊 (克重或入數)
+        const hasValidSpec = /\d+g|\d+入/.test(specNoSpace);
+        const specSource = hasValidSpec ? specNoSpace : nameNoSpace;
+
+        // 克重規格 (從大到小排序)
+        if (/300g/.test(specSource)) { column = 'B'; spec = '300g'; confidence = 0.9; }
+        else if (/280g/.test(specSource)) { column = 'C'; spec = '280g'; confidence = 0.9; }
+        else if (/200g/.test(specSource)) { column = 'C'; spec = '200g'; confidence = 0.9; }
+        else if (/150g/.test(specSource)) { column = 'B'; spec = '150g'; confidence = 0.9; }
+        else if (/135g/.test(specSource)) { column = 'C'; spec = '135g'; confidence = 0.9; }
+        else if (/120g/.test(specSource)) { column = 'B'; spec = '120g'; confidence = 0.9; }
+        else if (/90g/.test(specSource)) { column = 'B'; spec = '90g'; confidence = 0.9; }
+        else if (/60g/.test(specSource)) { column = 'B'; spec = '60g'; confidence = 0.9; }
+        else if (/50g/.test(specSource)) { column = 'B'; spec = '50g'; confidence = 0.9; }
+        else if (/45g/.test(specSource)) { column = 'B'; spec = '45g'; confidence = 0.9; }
+        // 入數規格
+        else if (/15入/.test(specSource)) { column = 'C'; spec = '15入袋裝'; confidence = 0.9; }
+        else if (/12入/.test(specSource)) { column = 'C'; spec = '12入袋裝'; confidence = 0.9; }
+        else if (/10入/.test(specSource)) { column = 'B'; spec = '10入袋裝'; confidence = 0.9; }
+        else if (/8入/.test(specSource)) { column = 'B'; spec = '8入袋裝'; confidence = 0.9; }
         else if (/單顆/.test(fullTextNoSpace) || /活動專用/.test(fullTextNoSpace) || /活動/.test(fullTextNoSpace)) {
             const isMadeleine = /瑪德蓮/.test(fullTextNoSpace);
             column = isMadeleine ? 'C' : 'D'; spec = '單顆'; confidence = 0.9;

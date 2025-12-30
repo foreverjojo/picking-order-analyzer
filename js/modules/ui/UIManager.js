@@ -10,7 +10,7 @@ import { getProductSortOrder } from '../rules/MappingEngine.js';
 import { formatFileSize } from './UIUtils.js';
 
 // 規格與欄位選項
-const specOptions = ['', '45g', '50g', '90g', '120g', '135g', '150g', '200g', '280g', '300g', '8入袋裝', '10入袋裝', '12入袋裝', '15入袋裝', '單顆', '禮盒'];
+const specOptions = ['', '45g', '50g', '60g', '90g', '120g', '135g', '150g', '200g', '280g', '300g', '8入袋裝', '10入袋裝', '12入袋裝', '15入袋裝', '單顆', '禮盒', '小包裝'];
 const columnOptions = ['', 'B', 'C', 'D', 'E'];
 
 /**

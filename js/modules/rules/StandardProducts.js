@@ -49,5 +49,5 @@ export function normalizeProductName(name) {
         }
     }
 
-    return bestMatch || name;
+    return bestMatch || null;
 }

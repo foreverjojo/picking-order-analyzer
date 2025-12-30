@@ -111,27 +111,37 @@ export function autoMapProductShopee(pickingName, pickingSpec, quantity) {
     }
 
     // === 西點餅乾 ===
-    if (!extractedFlavor && (/西點餅乾/.test(specNoSpace) || /西點餅乾/.test(nameNoSpace))) {
+    if (!extractedFlavor && (/西點餅乾/.test(specNoSpace) || /西點餅乾/.test(nameNoSpace) || /藍莓小花/.test(fullTextNoSpace) || /咖啡小花/.test(fullTextNoSpace) || /蔓越莓貝殼/.test(fullTextNoSpace) || /巧克力貝殼/.test(fullTextNoSpace) || /乳酪酥條/.test(fullTextNoSpace))) {
         if (/綜合/.test(specNoSpace) || /綜合西點/.test(nameNoSpace)) extractedFlavor = '西點-綜合';
-        else if (/乳酪酥條/.test(specNoSpace)) extractedFlavor = '西點-乳酪酥條';
-        else if (/蔓越莓貝殼/.test(specNoSpace)) extractedFlavor = '西點-蔓越莓貝殼';
-        else if (/藍莓小花/.test(specNoSpace)) extractedFlavor = '西點-藍莓小花';
-        else if (/咖啡小花/.test(specNoSpace)) extractedFlavor = '西點-咖啡小花';
-        else if (/巧克力貝殼/.test(specNoSpace)) extractedFlavor = '西點-巧克力貝殼';
+        else if (/乳酪酥條/.test(fullTextNoSpace)) extractedFlavor = '西點-乳酪酥條';
+        else if (/蔓越莓貝殼/.test(fullTextNoSpace)) extractedFlavor = '西點-蔓越莓貝殼';
+        else if (/藍莓小花/.test(fullTextNoSpace)) extractedFlavor = '西點-藍莓小花';
+        else if (/咖啡小花/.test(fullTextNoSpace)) extractedFlavor = '西點-咖啡小花';
+        else if (/巧克力貝殼/.test(fullTextNoSpace)) extractedFlavor = '西點-巧克力貝殼';
+    }
+
+    // === 堅果塔 ===
+    if (!extractedFlavor && /堅果塔/.test(fullTextNoSpace)) {
+        if (/蜂蜜/.test(fullTextNoSpace)) extractedFlavor = '堅果塔-蜂蜜';
+        else if (/法式焦糖|焦糖/.test(fullTextNoSpace)) extractedFlavor = '堅果塔-焦糖';
+        else if (/巧克力/.test(fullTextNoSpace)) extractedFlavor = '堅果塔-巧克力';
+        else if (/海苔/.test(fullTextNoSpace)) extractedFlavor = '堅果塔-海苔';
+        else if (/咖哩/.test(fullTextNoSpace)) extractedFlavor = '堅果塔-咖哩';
+        else if (/綜合/.test(fullTextNoSpace)) extractedFlavor = '堅果塔-綜合';
     }
 
     // === 夏威夷豆塔 ===
-    if (!extractedFlavor && /夏威夷豆塔/.test(nameNoSpace)) {
-        if (/蜂蜜蔓越莓|蔓越莓/.test(nameNoSpace)) extractedFlavor = '豆塔-蔓越莓';
-        else if (/焦糖/.test(nameNoSpace)) extractedFlavor = '豆塔-焦糖';
-        else if (/巧克力/.test(nameNoSpace)) extractedFlavor = '豆塔-巧克力';
-        else if (/抹茶/.test(nameNoSpace)) extractedFlavor = '豆塔-抹茶';
-        else if (/椒麻/.test(nameNoSpace)) extractedFlavor = '豆塔-椒麻';
-        else if (/綜合/.test(nameNoSpace)) extractedFlavor = '豆塔-綜合';
+    if (!extractedFlavor && /夏威夷豆塔/.test(fullTextNoSpace)) {
+        if (/蜂蜜蔓越莓|蔓越莓/.test(fullTextNoSpace)) extractedFlavor = '豆塔-蔓越莓';
+        else if (/焦糖/.test(fullTextNoSpace)) extractedFlavor = '豆塔-焦糖';
+        else if (/巧克力/.test(fullTextNoSpace)) extractedFlavor = '豆塔-巧克力';
+        else if (/抹茶/.test(fullTextNoSpace)) extractedFlavor = '豆塔-抹茶';
+        else if (/椒麻/.test(fullTextNoSpace)) extractedFlavor = '豆塔-椒麻';
+        else if (/綜合/.test(fullTextNoSpace)) extractedFlavor = '豆塔-綜合';
     }
 
     // === 奶油餅乾 ===
-    if (!extractedFlavor && /奶油曲奇餅乾|奶油餅乾/.test(nameNoSpace)) {
+    if (!extractedFlavor && (/奶油曲奇餅乾|奶油餅乾|奶油曲奇|經典熱銷餅乾/.test(fullTextNoSpace))) {
         if (/抹茶|小山園抹茶/.test(fullTextNoSpace)) extractedFlavor = '奶油-抹茶';
         else if (/焦糖牛奶/.test(fullTextNoSpace)) extractedFlavor = '奶油-焦糖牛奶';
         else if (/法國巧克力|巧克力/.test(fullTextNoSpace)) extractedFlavor = '奶油-法國巧克力';
@@ -141,6 +151,25 @@ export function autoMapProductShopee(pickingName, pickingSpec, quantity) {
 
     // === 千層小酥條 ===
     if (!extractedFlavor && /千層.*小酥條|小酥條/.test(fullTextNoSpace)) extractedFlavor = '千層-小酥條';
+
+    // === 雪花餅 ===
+    if (!extractedFlavor && /雪花餅/.test(fullTextNoSpace)) {
+        if (/蔓越莓/.test(fullTextNoSpace)) extractedFlavor = '雪花餅-蔓越莓';
+        else if (/巧克力/.test(fullTextNoSpace)) extractedFlavor = '雪花餅-巧克力';
+        else if (/金沙/.test(fullTextNoSpace)) extractedFlavor = '雪花餅-金沙';
+        else if (/抹茶/.test(fullTextNoSpace)) extractedFlavor = '雪花餅-抹茶';
+        else if (/肉鬆/.test(fullTextNoSpace)) extractedFlavor = '雪花餅-肉鬆';
+        else if (/綜合/.test(fullTextNoSpace)) extractedFlavor = '雪花餅-綜合';
+    }
+
+    // === 南棗核桃糕 ===
+    if (!extractedFlavor && /南棗核桃糕/.test(fullTextNoSpace)) extractedFlavor = '南棗核桃糕';
+
+    // === 鳳凰酥 ===
+    if (!extractedFlavor && /鳳凰酥/.test(fullTextNoSpace)) extractedFlavor = '鳳凰酥';
+
+    // === 雙塔 (非禮盒) ===
+    if (!extractedFlavor && /招牌雙塔組合|招牌雙塔/.test(fullTextNoSpace) && !/禮盒/.test(fullTextNoSpace)) extractedFlavor = '雙塔';
 
     if (extractedFlavor) productName = extractedFlavor;
 
@@ -153,22 +182,35 @@ export function autoMapProductShopee(pickingName, pickingSpec, quantity) {
     let spec = null;
     let confidence = 0.3;
 
+    // === 規格判斷 (優先順序：pickingSpec > pickingName) ===
+    // 正規化全形 g 為半形
+    const normalizedSpecNoSpace = specNoSpace.replace(/ｇ/g, 'g');
+    const normalizedNameNoSpace = nameNoSpace.replace(/ｇ/g, 'g');
+
+    // 先檢查來源規格是否包含有效的規格資訊 (克重或入數)
+    const hasValidSpec = /\d+g|\d+入/.test(normalizedSpecNoSpace);
+    const specSource = hasValidSpec ? normalizedSpecNoSpace : normalizedNameNoSpace;
+
     if (/禮盒/.test(fullText)) { column = 'B'; spec = '禮盒'; confidence = 0.95; multiplier = 1; }
+    // 克重規格：優先從 specSource 判斷 (從大到小)
+    else if (/300g/.test(specSource)) { column = 'B'; spec = '300g'; confidence = 0.95; multiplier = 1; }
+    else if (/280g/.test(specSource)) { column = 'C'; spec = '280g'; confidence = 0.95; multiplier = 1; }
+    else if (/200g/.test(specSource)) { column = 'C'; spec = '200g'; confidence = 0.95; multiplier = 1; }
+    else if (/150g/.test(specSource)) { column = 'B'; spec = '150g'; confidence = 0.95; multiplier = 1; }
+    else if (/135g/.test(specSource)) { column = 'C'; spec = '135g'; confidence = 0.95; multiplier = 1; }
+    else if (/120g/.test(specSource)) { column = 'B'; spec = '120g'; confidence = 0.95; multiplier = 1; }
+    else if (/90g/.test(specSource)) { column = 'B'; spec = '90g'; confidence = 0.95; multiplier = 1; }
+    else if (/60g/.test(specSource)) { column = 'B'; spec = '60g'; confidence = 0.95; multiplier = 1; }
+    else if (/50g/.test(specSource)) { column = 'B'; spec = '50g'; confidence = 0.95; multiplier = 1; }
+    else if (/45g/.test(specSource)) { column = 'B'; spec = '45g'; confidence = 0.95; multiplier = 1; }
+    // 入數規格
+    else if (/15入/.test(specSource)) { column = 'C'; spec = '15入袋裝'; confidence = 0.9; }
+    else if (/12入/.test(specSource)) { column = 'C'; spec = '12入袋裝'; confidence = 0.9; }
+    else if (/10入/.test(specSource)) { column = 'B'; spec = '10入袋裝'; confidence = 0.9; }
+    else if (/8入/.test(specSource)) { column = 'B'; spec = '8入袋裝'; confidence = 0.9; }
+    // 特殊商品規格
     else if (productName === '瓦片-原味45克') { column = 'B'; spec = null; confidence = 0.95; multiplier = 1; }
     else if (productName === '千層-小酥條') { column = 'B'; spec = '小包裝'; confidence = 0.95; multiplier = 1; }
-    else if (/45g/.test(pickingSpec)) { column = 'B'; spec = '45g'; confidence = 0.95; multiplier = 1; }
-    else if (/50g/.test(pickingSpec)) { column = 'B'; spec = '50g'; confidence = 0.95; multiplier = 1; }
-    else if (/90g/.test(pickingSpec)) { column = 'B'; spec = '90g'; confidence = 0.95; multiplier = 1; }
-    else if (/120g/.test(pickingSpec)) { column = 'B'; spec = '120g'; confidence = 0.95; multiplier = 1; }
-    else if (/135g/.test(pickingSpec)) { column = 'C'; spec = '135g'; confidence = 0.95; multiplier = 1; }
-    else if (/150g/.test(pickingSpec)) { column = 'B'; spec = '150g'; confidence = 0.95; multiplier = 1; }
-    else if (/200g/.test(pickingSpec)) { column = 'C'; spec = '200g'; confidence = 0.95; multiplier = 1; }
-    else if (/280g/.test(pickingSpec)) { column = 'C'; spec = '280g'; confidence = 0.95; multiplier = 1; }
-    else if (/300g/.test(pickingSpec)) { column = 'B'; spec = '300g'; confidence = 0.95; multiplier = 1; }
-    else if (/10入/.test(specNoSpace) || /10入/.test(nameNoSpace)) { column = 'B'; spec = '10入袋裝'; confidence = 0.9; }
-    else if (/15入/.test(specNoSpace) || /15入/.test(nameNoSpace)) { column = 'C'; spec = '15入袋裝'; confidence = 0.9; }
-    else if (/12入/.test(specNoSpace) || /12入/.test(nameNoSpace)) { column = 'C'; spec = '12入袋裝'; confidence = 0.9; }
-    else if (/8入/.test(specNoSpace) || /8入/.test(nameNoSpace)) { column = 'B'; spec = '8入袋裝'; confidence = 0.9; }
     else if (/單顆/.test(fullText) || /單個/.test(fullText) || /活動/.test(fullText)) {
         const isMadeleine = /瑪德蓮/.test(fullTextNoSpaceTemp);
         column = isMadeleine ? 'C' : 'D'; spec = '單顆'; confidence = 0.85;
@@ -176,15 +218,22 @@ export function autoMapProductShopee(pickingName, pickingSpec, quantity) {
         if (countMatch) multiplier = parseInt(countMatch[1]);
     }
 
-    const mappedQuantity = column ? quantity * multiplier : 0;
+    // 標準化商品名稱
     const standardizedName = normalizeProductName(productName);
 
+    // 如果沒有成功映射到商品，清除欄位和規格
+    const finalProduct = standardizedName || null;
+    if (!finalProduct) {
+        column = null;
+        spec = null;
+    }
+
     return {
-        templateProduct: standardizedName,
+        templateProduct: finalProduct,
         templateColumn: column,
         templateSpec: spec,
         multiplier: multiplier,
-        mappedQuantity: mappedQuantity,
-        confidence: confidence
+        mappedQuantity: finalProduct ? quantity * multiplier : 0,
+        confidence: finalProduct ? confidence : 0
     };
 }
