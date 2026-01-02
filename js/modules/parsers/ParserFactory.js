@@ -117,3 +117,6 @@ export async function parseFile(file) {
 
     throw new Error('不支援的檔案格式或無法識別平台: ' + file.name);
 }
+
+// 匯出內容偵測函數供 app.js 使用
+export { previewExcelForPlatform };

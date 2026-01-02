@@ -5,7 +5,7 @@
  */
 
 import { state, resetState, setUploadedFile } from './modules/core/StateManager.js';
-import { parseFile } from './modules/parsers/ParserFactory.js';
+import { parseFile, previewExcelForPlatform } from './modules/parsers/ParserFactory.js';
 import { consolidateAndMap, calculateStatistics } from './modules/core/LogicEngine.js';
 import { downloadReport, downloadPickingList } from './modules/export/ExportManager.js';
 import { showLoading, hideLoading, showToast } from './modules/ui/UIUtils.js';
@@ -110,12 +110,39 @@ async function handleFiles(files) {
 
 async function identifyPlatform(file) {
     const fileName = file.name.toLowerCase();
-    if (fileName.includes('橘點子') || (fileName.endsWith('.xls') && !fileName.endsWith('.xlsx'))) return { platform: 'orangepoint' };
-    if ((fileName.includes('momo') || fileName.includes('富邦')) && fileName.endsWith('.xlsx')) return { platform: 'momo' };
-    if (fileName.includes('官網') && fileName.endsWith('.xlsx')) return { platform: 'official' };
-    if (fileName.endsWith('.pdf')) return { platform: 'shopee' };
-    if (fileName.includes('統計') || fileName.endsWith('.xlsm')) return { platform: 'template' };
-    if (fileName.endsWith('.xlsx')) return { platform: 'momo' }; // Default
+
+    // 1. 優先使用檔名判斷（速度最快）
+    if (fileName.includes('橘點子') || fileName.includes('jellytree')) {
+        return { platform: 'orangepoint' };
+    }
+    if ((fileName.includes('momo') || fileName.includes('富邦') || fileName.includes('order_export')) && fileName.endsWith('.xlsx')) {
+        return { platform: 'momo' };
+    }
+    if (fileName.includes('官網') && fileName.endsWith('.xlsx')) {
+        return { platform: 'official' };
+    }
+    if (fileName.endsWith('.pdf')) {
+        return { platform: 'shopee' };
+    }
+    if (fileName.includes('統計') || fileName.endsWith('.xlsm')) {
+        return { platform: 'template' };
+    }
+
+    // 2. 無法從檔名識別 - 呼叫內容偵測（統一使用 ParserFactory 的邏輯）
+    if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+        const detection = await previewExcelForPlatform(file);
+
+        if (detection.platform) {
+            console.log(`智慧識別：檔案「${file.name}」判定為 ${detection.platform}`);
+            return { platform: detection.platform };
+        }
+
+        // 3. 內容也無法判斷 - 使用預設邏輯
+        const defaultPlatform = fileName.endsWith('.xls') ? 'orangepoint' : 'official';
+        console.log(`預設邏輯：檔案「${file.name}」預設為 ${defaultPlatform}`);
+        return { platform: defaultPlatform };
+    }
+
     throw new Error('未知格式');
 }
 
