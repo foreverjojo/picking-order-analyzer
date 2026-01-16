@@ -43,7 +43,7 @@ export function autoMapProductShopee(pickingName, pickingSpec, quantity) {
         else if (/戀戀雪花禮盒|新戀戀雪花/.test(fullTextNoSpace)) extractedFlavor = '戀戀雪花禮盒';
         else if (/浪漫詩篇禮盒|新浪漫詩篇/.test(fullTextNoSpace)) extractedFlavor = '浪漫詩篇禮盒';
         else if (/暖暖幸福禮盒|新暖暖幸福/.test(fullTextNoSpace)) extractedFlavor = '暖暖幸福禮盒';
-        else if (/臻愛時光禮盒|新臻愛時光/.test(fullTextNoSpace)) extractedFlavor = '臻愛時光禮盒';
+        else if (/臻愛時光禮盒|新臻愛時光|臻愛時光/.test(fullTextNoSpace)) extractedFlavor = '臻愛時光禮盒';
         else if (/濃情滿載禮盒|新濃情滿載/.test(fullTextNoSpace)) extractedFlavor = '濃情滿載禮盒';
         else if (/午後漫步禮盒|新午後漫步/.test(fullTextNoSpace)) extractedFlavor = '午後漫步禮盒';
         else if (/那年花開禮盒|新那年花開/.test(fullTextNoSpace)) extractedFlavor = '那年花開禮盒';
@@ -56,6 +56,11 @@ export function autoMapProductShopee(pickingName, pickingSpec, quantity) {
         else if (/蔓越莓禮盒/.test(fullTextNoSpace)) extractedFlavor = '蔓越莓禮盒';
         else if (/綜豆禮盒/.test(fullTextNoSpace)) extractedFlavor = '綜豆禮盒';
         else if (/綜堅禮盒/.test(fullTextNoSpace)) extractedFlavor = '綜堅禮盒';
+    }
+
+    // === 臻愛時光禮盒 (特殊處理:可能沒有「禮盒」關鍵字) ===
+    if (!extractedFlavor && /臻愛時光/.test(fullTextNoSpace)) {
+        extractedFlavor = '臻愛時光禮盒';
     }
 
     // === 瑪德蓮口味 ===

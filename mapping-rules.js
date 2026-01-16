@@ -418,7 +418,7 @@ function autoMapProductShopee(pickingName, pickingSpec, quantity) {
             extractedFlavor = '浪漫詩篇禮盒';
         } else if (/暖暖幸福禮盒|新暖暖幸福/.test(fullTextNoSpace)) {
             extractedFlavor = '暖暖幸福禮盒';
-        } else if (/臻愛時光禮盒|新臻愛時光/.test(fullTextNoSpace)) {
+        } else if (/臻愛時光禮盒|新臻愛時光|臻愛時光/.test(fullTextNoSpace)) {
             extractedFlavor = '臻愛時光禮盒';
         } else if (/濃情滿載禮盒|新濃情滿載/.test(fullTextNoSpace)) {
             extractedFlavor = '濃情滿載禮盒';
@@ -445,6 +445,11 @@ function autoMapProductShopee(pickingName, pickingSpec, quantity) {
         } else if (/綜堅禮盒/.test(fullTextNoSpace)) {
             extractedFlavor = '綜堅禮盒';
         }
+    }
+
+    // === 臻愛時光禮盒 (特殊處理:可能沒有「禮盒」關鍵字) ===
+    if (!extractedFlavor && /臻愛時光/.test(fullTextNoSpace)) {
+        extractedFlavor = '臻愛時光禮盒';
     }
 
     // === 瑪德蓮口味 ===
