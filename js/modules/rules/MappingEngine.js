@@ -40,16 +40,30 @@ export function autoMapProduct(pickingName, pickingSpec, quantity, platform = 's
         }
     }
 
-    // 處理組合拆分商品（豆塔組合包）
+    // 處理組合拆分商品（通用口味提取）
     if (/組合拆分/.test(pickingName)) {
+        // 提取產品類型和口味
+        let productType = null;
         let flavor = null;
-        if (/蔓越莓/.test(pickingName)) flavor = '豆塔-蔓越莓';
-        else if (/焦糖/.test(pickingName)) flavor = '豆塔-焦糖';
 
-        if (flavor) {
-            console.log(`組合拆分映射: ${pickingName} → ${flavor}, B欄, 10入袋裝, 數量 ${quantity}`);
+        // 產品類型匹配
+        if (/豆塔/.test(pickingName)) productType = '豆塔';
+        else if (/堅果塔/.test(pickingName)) productType = '堅果塔';
+        else if (/雪花餅/.test(pickingName)) productType = '雪花餅';
+        else if (/瑪德蓮/.test(pickingName)) productType = '瑪德蓮';
+        else if (/瓦片/.test(pickingName)) productType = '瓦片';
+
+        // 口味匹配 (支援所有口味)
+        const flavorMatch = pickingName.match(/-(蔓越莓|焦糖|巧克力|抹茶|椒麻|綜合|蜂蜜|原味|紅茶|海苔|黑糖|青花椒|金沙|肉鬆|檸檬|柑橘|咖哩)/);
+        if (flavorMatch) {
+            flavor = flavorMatch[1];
+        }
+
+        if (productType && flavor) {
+            const mappedProduct = `${productType}-${flavor}`;
+            console.log(`組合拆分映射: ${pickingName} → ${mappedProduct}, B欄, 10入袋裝, 數量 ${quantity}`);
             return {
-                templateProduct: flavor,
+                templateProduct: mappedProduct,
                 templateColumn: 'B',
                 templateSpec: '10入袋裝',
                 multiplier: 1,
