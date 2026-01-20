@@ -131,13 +131,29 @@ function autoMapProductMomo(pickingName, pickingSpec, quantity) {
     let multiplier = 1;
     let confidence = 0.3;
 
-    // 提取倍數（如 x3包 或 2盒）
-    const multiplierMatchPack = fullText.match(/x(\d+)包/);
-    const multiplierMatchBox = specNoSpace.match(/^(\d+)盒/);
-    if (multiplierMatchPack) {
-        multiplier = parseInt(multiplierMatchPack[1]);
-    } else if (multiplierMatchBox) {
-        multiplier = parseInt(multiplierMatchBox[1]);
+    // 提取倍數 (支援累加格式 x2袋/x1袋, 及組合格式 2包組、2袋組)
+    // 1. 檢查累加格式: x2袋/x1袋 或 x2包/x1包
+    const multiPackMatches = fullText.match(/x(\d+)[包袋]/g);
+    if (multiPackMatches && multiPackMatches.length > 0) {
+        // 累加所有匹配到的數量
+        multiplier = multiPackMatches.reduce((sum, match) => {
+            const num = parseInt(match.match(/x(\d+)/)[1]);
+            return sum + num;
+        }, 0);
+    }
+    // 2. 檢查組合格式: 2包組、2袋組
+    else {
+        const groupMatch = fullText.match(/(\d+)[包袋]組/);
+        if (groupMatch) {
+            multiplier = parseInt(groupMatch[1]);
+        }
+        // 3. 檢查盒裝格式: 2盒
+        else {
+            const boxMatch = specNoSpace.match(/^(\d+)盒/);
+            if (boxMatch) {
+                multiplier = parseInt(boxMatch[1]);
+            }
+        }
     }
 
     // === 禮盒類型 ===
