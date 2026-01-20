@@ -9,6 +9,68 @@ import { state } from './StateManager.js';
 import { autoMapProduct } from '../rules/MappingEngine.js';
 
 /**
+ * 檢查是否為多口味組合
+ * @param {string} spec 規格字串
+ * @returns {boolean}
+ */
+function isMultiFlavorCombo(spec) {
+    if (!spec) return false;
+    const specNoSpace = spec.replace(/\s+/g, '');
+    // 檢查是否有多個不同口味組合 (至少 2 個 xN[袋包] 且用 / 分隔)
+    const matches = specNoSpace.match(/x\d+[袋包]/g);
+    return matches && matches.length >= 2 && /\//.test(specNoSpace);
+}
+
+/**
+ * 解析多口味組合
+ * @param {string} fullText 完整文字 (商品名稱+規格)
+ * @param {string} spec 規格字串
+ * @param {string} productName 原始商品名稱
+ * @returns {Array} 解析結果陣列
+ */
+function parseMultiFlavorCombo(fullText, spec, productName) {
+    const parts = spec.split('/');
+    const results = [];
+
+    // 判斷商品類型
+    const fullTextNoSpace = fullText.replace(/\s+/g, '');
+    let productType = '未知';
+    if (/夏威夷豆塔/.test(fullTextNoSpace)) productType = '豆塔';
+    else if (/堅果塔/.test(fullTextNoSpace)) productType = '堅果塔';
+    else if (/雪花餅/.test(fullTextNoSpace)) productType = '雪花餅';
+    else if (/瑪德蓮/.test(fullTextNoSpace)) productType = '瑪德蓮';
+    else if (/瓦片/.test(fullTextNoSpace)) productType = '瓦片';
+
+    parts.forEach(part => {
+        const partNoSpace = part.replace(/\s+/g, '');
+
+        // 提取口味關鍵字 (擴充支援更多口味)
+        const flavorMatch = partNoSpace.match(/(蔓越莓|焦糖|巧克力|抹茶|椒麻|綜合|蜂蜜|原味|紅茶|海苔|黑糖|青花椒|金沙|肉鬆|檸檬|柑橘|蜂蜜蔓越莓|咖哩)/);
+
+        // 提取倍數
+        const multiplierMatch = partNoSpace.match(/x(\d+)[袋包]/);
+
+        // 提取規格 (入數)
+        const specMatch = partNoSpace.match(/(\d+)入/);
+
+        if (flavorMatch && multiplierMatch) {
+            let flavor = flavorMatch[1];
+            // 特殊處理: 蜂蜜蔓越莓 → 蔓越莓
+            if (flavor === '蜂蜜蔓越莓') flavor = '蔓越莓';
+
+            results.push({
+                productType: productType,
+                flavor: flavor,
+                multiplier: parseInt(multiplierMatch[1]),
+                spec: specMatch ? specMatch[1] + '入袋裝' : '10入袋裝'
+            });
+        }
+    });
+
+    return results;
+}
+
+/**
  * 拆分特殊商品規則 (例如：瑪德蓮 2 入拆分為單顆)
  * @param {Array} products 原始商品列表
  * @returns {Array} 拆分後的商品列表
@@ -18,6 +80,27 @@ export function splitSpecialProducts(products) {
 
     products.forEach(product => {
         const fullText = ((product.name || '') + (product.spec || '')).replace(/\s+/g, '');
+
+        // === 新增: 通用多口味組合拆分 ===
+        if (isMultiFlavorCombo(product.spec)) {
+            const flavorCombos = parseMultiFlavorCombo(fullText, product.spec, product.name);
+
+            if (flavorCombos.length >= 2) {
+                // 成功解析出多個口味，進行拆分
+                flavorCombos.forEach(combo => {
+                    result.push({
+                        ...product,
+                        name: `${combo.productType}-${combo.flavor}（組合拆分）`,
+                        spec: combo.spec,
+                        quantity: product.quantity * combo.multiplier,
+                        originalName: product.name,
+                        originalSpec: product.spec,
+                        isSplit: true
+                    });
+                });
+                return; // 跳過原始商品，不加入 result
+            }
+        }
 
         // 胖貝殼瑪德蓮-2入 拆分為 蜂蜜 + 巧克力
         if (/胖貝殼瑪德蓮/.test(fullText) && /2入/.test(fullText)) {
