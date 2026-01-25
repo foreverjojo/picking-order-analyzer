@@ -109,16 +109,16 @@ function initializeEventListeners() {
 
 // ==================== 檔案處理 ====================
 function handleFileSelect(event) {
-    const files = Array.from(event.target.files);
+    const files = Array.from(event.target.files || event.dataTransfer.files);
 
     files.forEach(file => {
         const fileName = file.name.toLowerCase();
 
-        // 橘點子識別（.xls 格式或檔名包含橘點子）
-        if (fileName.includes('橘點子') || (fileName.endsWith('.xls') && !fileName.endsWith('.xlsx'))) {
+        // 橘點子識別
+        if (fileName.includes('橘點子') || fileName.includes('jellytree') || (fileName.endsWith('.xls') && !fileName.endsWith('.xlsx'))) {
             uploadedFiles.orangepoint = file;
             addFileToList(file, '橘點子撿貨單', '🍊');
-        } else if ((fileName.includes('momo') || fileName.includes('富邦')) && fileName.endsWith('.xlsx')) {
+        } else if ((fileName.includes('momo') || fileName.includes('富邦') || fileName.includes('order_export')) && fileName.endsWith('.xlsx')) {
             uploadedFiles.momo = file;
             addFileToList(file, 'MOMO 撿貨單', '📊');
         } else if (fileName.includes('官網') && fileName.endsWith('.xlsx')) {
@@ -127,18 +127,15 @@ function handleFileSelect(event) {
         } else if (fileName.endsWith('.pdf')) {
             uploadedFiles.shopee = file;
             addFileToList(file, '蝦皮撿貨單', '📄');
-        } else if (fileName.includes('統計表') || fileName.endsWith('.xlsm') || fileName.includes('統計')) {
+        } else if (fileName.includes('統計') || fileName.endsWith('.xlsm')) {
             uploadedFiles.template = file;
             addFileToList(file, '報表範本', '📋');
         } else if (fileName.endsWith('.xlsx')) {
-            // 根據順序分配
-            if (!uploadedFiles.momo) {
-                uploadedFiles.momo = file;
-                addFileToList(file, 'MOMO 撿貨單', '📊');
-            } else if (!uploadedFiles.official) {
-                uploadedFiles.official = file;
-                addFileToList(file, '官網撿貨單', '📊');
-            }
+            // 預設為官網
+            uploadedFiles.official = file;
+            addFileToList(file, '官網撿貨單', '📊');
+        } else {
+            alert('未知格式或無法識別平台: ' + file.name);
         }
     });
 

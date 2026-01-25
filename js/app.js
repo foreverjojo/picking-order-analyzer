@@ -99,13 +99,26 @@ function setupActionEvents() {
 }
 
 async function handleFiles(files) {
+    let hasError = false;
     for (const file of Array.from(files)) {
         try {
             const { platform } = await identifyPlatform(file);
-            state.uploadedFiles[platform] = file;
-        } catch (e) { console.warn(e.message); }
+            if (platform) {
+                state.uploadedFiles[platform] = file;
+            } else {
+                showToast(`無法識別檔案類型: ${file.name}`, 'warning');
+                hasError = true;
+            }
+        } catch (e) {
+            console.warn(e.message);
+            showToast(`檔案處理失敗: ${file.name} - ${e.message}`, 'error');
+            hasError = true;
+        }
     }
     UI.updateFileList();
+    if (!hasError && files.length > 0) {
+        showToast('檔案已成功加入列表', 'success');
+    }
 }
 
 async function identifyPlatform(file) {

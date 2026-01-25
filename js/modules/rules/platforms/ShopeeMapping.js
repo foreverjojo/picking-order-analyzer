@@ -174,7 +174,7 @@ export function autoMapProductShopee(pickingName, pickingSpec, quantity) {
     if (!extractedFlavor && /鳳凰酥/.test(fullTextNoSpace)) extractedFlavor = '鳳凰酥';
 
     // === 雙塔 (非禮盒) ===
-    if (!extractedFlavor && /招牌雙塔組合|招牌雙塔/.test(fullTextNoSpace) && !/禮盒/.test(fullTextNoSpace)) extractedFlavor = '雙塔';
+    if (!extractedFlavor && /雙塔組合|招牌雙塔組合|招牌雙塔/.test(fullTextNoSpace) && !/禮盒/.test(fullTextNoSpace)) extractedFlavor = '雙塔';
 
     if (extractedFlavor) productName = extractedFlavor;
 

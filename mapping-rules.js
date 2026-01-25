@@ -609,7 +609,7 @@ function autoMapProductShopee(pickingName, pickingSpec, quantity) {
     }
 
     // === 招牌雙塔組合 ===
-    if (!extractedFlavor && /招牌雙塔組合/.test(fullTextNoSpace)) {
+    if (!extractedFlavor && /雙塔組合|招牌雙塔組合|招牌雙塔/.test(fullTextNoSpace) && !/禮盒/.test(fullTextNoSpace)) {
         extractedFlavor = '雙塔';
     }
 
