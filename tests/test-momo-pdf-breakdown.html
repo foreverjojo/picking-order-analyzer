@@ -1,0 +1,254 @@
+<!-- @purpose 解析 MOMO PDF 並列出豆塔各口味貢獻明細（用於排查總數差異） -->
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Debug：MOMO PDF 豆塔明細</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        body { font-family: system-ui, -apple-system, "Segoe UI", Arial, "Noto Sans TC", sans-serif; padding: 16px; }
+        .row { display: grid; grid-template-columns: 1fr; gap: 10px; max-width: 1100px; }
+        pre { background: #f6f8fa; padding: 12px; overflow: auto; max-height: 50vh; }
+        table { border-collapse: collapse; width: 100%; font-size: 13px; }
+        th, td { border: 1px solid #ddd; padding: 6px 8px; vertical-align: top; }
+        th { background: #fafafa; }
+        .muted { color: #666; }
+        .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #eee; }
+        .warn { background: #fff3cd; }
+    </style>
+</head>
+
+<body>
+    <h1>Debug：MOMO PDF 豆塔口味貢獻明細</h1>
+    <p class="muted">用途：找出為什麼「豆塔-蔓越莓/巧克力/綜合」被多算，並列出每筆來源的 name/spec/quantity/multiplier。</p>
+    <p class="muted">提醒：此頁需用本地伺服器開啟（例如 VS Code Live Server），不要用 <span class="pill">file://</span> 直接開檔。</p>
+
+    <div class="row">
+        <input id="fileInput" type="file" accept=".pdf" />
+        <button id="runBtn">解析並輸出明細</button>
+
+        <div>
+            <h2>統計</h2>
+            <pre id="summary"></pre>
+        </div>
+
+        <div>
+            <h2>明細（只列 豆塔-蔓越莓 / 豆塔-巧克力 / 豆塔-綜合）</h2>
+            <div id="tableWrap"></div>
+        </div>
+
+        <div>
+            <h2>原始解析（前 30 筆）</h2>
+            <pre id="raw"></pre>
+        </div>
+
+        <div>
+            <h2>豆塔明細 JSON（可直接複製貼回）</h2>
+            <pre id="beanJson"></pre>
+        </div>
+    </div>
+
+    <script>
+        // 讓「看起來沒反應」的錯誤直接顯示在畫面上
+        window.addEventListener('error', (e) => {
+            const el = document.getElementById('summary');
+            if (!el) return;
+            el.textContent = JSON.stringify({
+                error: e && e.message ? e.message : String(e),
+                filename: e && e.filename ? e.filename : undefined,
+                lineno: e && e.lineno ? e.lineno : undefined,
+                colno: e && e.colno ? e.colno : undefined
+            }, null, 2);
+        });
+        window.addEventListener('unhandledrejection', (e) => {
+            const el = document.getElementById('summary');
+            if (!el) return;
+            const reason = e && e.reason ? e.reason : e;
+            el.textContent = JSON.stringify({
+                unhandledRejection: reason && reason.message ? reason.message : String(reason)
+            }, null, 2);
+        });
+    </script>
+
+    <script type="module">
+        import { state, resetState } from '../js/modules/core/StateManager.js';
+        import { parseFile } from '../js/modules/parsers/ParserFactory.js';
+        import { consolidateAndMap } from '../js/modules/core/LogicEngine.js';
+        import { initializeData, isDataReady } from '../js/modules/core/DataManager.js';
+        import { updateStandardNamesCache } from '../js/modules/rules/StandardProducts.js';
+
+        const fileInput = document.getElementById('fileInput');
+        const runBtn = document.getElementById('runBtn');
+        const summaryEl = document.getElementById('summary');
+        const rawEl = document.getElementById('raw');
+        const beanJsonEl = document.getElementById('beanJson');
+        const tableWrap = document.getElementById('tableWrap');
+
+        if (!window.pdfjsLib) {
+            summaryEl.textContent = JSON.stringify({
+                error: 'PDF.js 未載入成功，請確認網路可連線到 cdnjs',
+                hint: '若你在公司網路被擋，可改成本地引入 pdf.min.js'
+            }, null, 2);
+        } else {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+
+        try {
+            await initializeData();
+            updateStandardNamesCache();
+        } catch (e) {
+            summaryEl.textContent = JSON.stringify({
+                warning: '資料初始化失敗，仍可嘗試解析，但映射可能不完整',
+                error: e && e.message ? e.message : String(e)
+            }, null, 2);
+        }
+
+        let currentFile = null;
+
+        fileInput.addEventListener('change', () => {
+            currentFile = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+            // 保持可點擊；未選檔時在 click handler 提示
+        });
+
+        function escapeHtml(s) {
+            return String(s)
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
+
+        function buildTable(rows) {
+            const headers = ['templateProduct', 'mappedQuantity', 'quantity', 'multiplier', 'confidence', 'name', 'spec', 'source', 'isSplit', 'originalName', 'originalSpec'];
+            const html = [
+                '<table>',
+                '<thead><tr>' + headers.map(h => `<th>${escapeHtml(h)}</th>`).join('') + '</tr></thead>',
+                '<tbody>'
+            ];
+
+            for (const r of rows) {
+                const warn = (r.multiplier && r.multiplier > 1 && !r.isSplit && /x\d+[袋包]/.test((r.name || '') + (r.spec || '')));
+                html.push(`<tr${warn ? ' class="warn"' : ''}>` + headers.map(h => `<td>${escapeHtml(r[h] ?? '')}</td>`).join('') + '</tr>');
+            }
+
+            html.push('</tbody></table>');
+            return html.join('');
+        }
+
+        runBtn.addEventListener('click', async () => {
+            if (!currentFile) {
+                summaryEl.textContent = JSON.stringify({
+                    error: '請先選擇 PDF 檔案'
+                }, null, 2);
+                return;
+            }
+
+            if (!window.pdfjsLib) {
+                summaryEl.textContent = JSON.stringify({
+                    error: 'PDF.js 未載入成功，無法解析 PDF',
+                    hint: '請確認網路或改用 Live Server 重新整理'
+                }, null, 2);
+                return;
+            }
+
+            runBtn.disabled = true;
+            const originalBtnText = runBtn.textContent;
+            runBtn.textContent = '解析中...';
+            summaryEl.textContent = JSON.stringify({
+                status: '開始解析 PDF...'
+            }, null, 2);
+
+            try {
+                resetState();
+
+                // 僅測 MOMO PDF
+                const { platform, data } = await parseFile(currentFile);
+                state.parsedData[platform] = data;
+
+                summaryEl.textContent = JSON.stringify({
+                    status: '解析完成，開始映射...'
+                }, null, 2);
+
+                consolidateAndMap();
+
+                rawEl.textContent = JSON.stringify(data.slice(0, 30), null, 2);
+
+            const targets = new Set(['豆塔-蔓越莓', '豆塔-巧克力', '豆塔-綜合']);
+            const rows = state.mappedProducts.filter(p => targets.has(p.templateProduct));
+
+            const beanRowsAll = state.mappedProducts.filter(p => (p.templateProduct || '').startsWith('豆塔-'));
+            const beanRowsAllForCopy = beanRowsAll.map(p => ({
+                templateProduct: p.templateProduct,
+                mappedQuantity: p.mappedQuantity,
+                quantity: p.quantity,
+                multiplier: p.multiplier,
+                confidence: p.confidence,
+                name: p.name,
+                spec: p.spec,
+                source: p.source,
+                isSplit: p.isSplit,
+                originalName: p.originalName,
+                originalSpec: p.originalSpec
+            }));
+            const beanTotalsAll = beanRowsAll.reduce((acc, p) => {
+                const key = p.templateProduct;
+                acc[key] = (acc[key] || 0) + (p.mappedQuantity || p.quantity || 0);
+                return acc;
+            }, {});
+
+            const suspiciousBeanRows = beanRowsAllForCopy.filter(r => {
+                const text = `${r.name || ''}${r.spec || ''}`;
+                return !r.isSplit && (r.multiplier || 1) > 1 && /x\d+/.test(text);
+            });
+
+            const summary = rows.reduce((acc, p) => {
+                acc[p.templateProduct] = (acc[p.templateProduct] || 0) + (p.mappedQuantity || p.quantity || 0);
+                return acc;
+            }, {});
+
+            summaryEl.textContent = JSON.stringify({
+                platform,
+                dataReady: isDataReady(),
+                parsedItems: data.length,
+                mappedItems: state.mappedProducts.length,
+                totals: summary,
+                beanTotalsAll,
+                suspiciousRows: suspiciousBeanRows.length,
+                rows: rows.length
+            }, null, 2);
+
+            beanJsonEl.textContent = JSON.stringify({
+                beanRowsAll: beanRowsAllForCopy,
+                suspiciousBeanRows
+            }, null, 2);
+
+                tableWrap.innerHTML = buildTable(rows.map(p => ({
+                    templateProduct: p.templateProduct,
+                    mappedQuantity: p.mappedQuantity,
+                    quantity: p.quantity,
+                    multiplier: p.multiplier,
+                    confidence: p.confidence,
+                    name: p.name,
+                    spec: p.spec,
+                    source: p.source,
+                    isSplit: p.isSplit,
+                    originalName: p.originalName,
+                    originalSpec: p.originalSpec
+                })));
+            } catch (e) {
+                summaryEl.textContent = JSON.stringify({
+                    error: e && e.message ? e.message : String(e),
+                    stack: e && e.stack ? String(e.stack).split('\n').slice(0, 8).join('\n') : undefined
+                }, null, 2);
+            } finally {
+                runBtn.disabled = false;
+                runBtn.textContent = originalBtnText;
+            }
+        });
+    </script>
+</body>
+
+</html>

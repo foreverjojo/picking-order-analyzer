@@ -5,7 +5,7 @@
  */
 
 import { state, resetState, setUploadedFile } from './modules/core/StateManager.js';
-import { parseFile, previewExcelForPlatform } from './modules/parsers/ParserFactory.js';
+import { parseFile, previewExcelForPlatform, previewPdfForPlatform } from './modules/parsers/ParserFactory.js';
 import { consolidateAndMap, calculateStatistics } from './modules/core/LogicEngine.js';
 import { downloadReport, downloadPickingList } from './modules/export/ExportManager.js';
 import { showLoading, hideLoading, showToast } from './modules/ui/UIUtils.js';
@@ -135,6 +135,16 @@ async function identifyPlatform(file) {
         return { platform: 'official' };
     }
     if (fileName.endsWith('.pdf')) {
+        // 檢查 PDF 內容是否為 MOMO（例如：商店欄位含 MO店），以便套用 MOMO 的映射規則
+        try {
+            const detection = await previewPdfForPlatform(file);
+            if (detection.platform) {
+                console.log(`智慧識別（PDF）：檔案「${file.name}」判定為 ${detection.platform}`);
+                return { platform: detection.platform };
+            }
+        } catch (e) {
+            console.warn('PDF 偵測失敗，預設為蝦皮: ', e);
+        }
         return { platform: 'shopee' };
     }
     if (fileName.includes('統計') || fileName.endsWith('.xlsm')) {

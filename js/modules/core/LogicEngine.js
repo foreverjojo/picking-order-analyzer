@@ -29,7 +29,6 @@ function isMultiFlavorCombo(spec) {
  * @returns {Array} 解析結果陣列
  */
 function parseMultiFlavorCombo(fullText, spec, productName) {
-    const parts = spec.split('/');
     const results = [];
 
     // 判斷商品類型
@@ -41,11 +40,39 @@ function parseMultiFlavorCombo(fullText, spec, productName) {
     else if (/瑪德蓮/.test(fullTextNoSpace)) productType = '瑪德蓮';
     else if (/瓦片/.test(fullTextNoSpace)) productType = '瓦片';
 
+    // MOMO 常見格式：無 / 分隔，口味段落以空白串接，例如：綜合口味10入x2袋 蜂蜜蔓越莓口味10入x1袋
+    if (!/\//.test(spec || '')) {
+        const comboTextNoSpace = (fullText || '').replace(/\s+/g, '');
+        const segmentRegex = /(蜂蜜蔓越莓|蔓越莓|焦糖|巧克力|抹茶|椒麻|綜合|蜂蜜|原味|紅茶|海苔|黑糖|青花椒|金沙|肉鬆|檸檬|柑橘|咖哩)(?:口味)?(?:(\d+)入)?x(\d+)[袋包]/g;
+
+        for (const match of comboTextNoSpace.matchAll(segmentRegex)) {
+            let flavor = match[1];
+            // 特殊處理: 蜂蜜蔓越莓 → 蔓越莓
+            if (flavor === '蜂蜜蔓越莓') flavor = '蔓越莓';
+
+            const unitCount = match[2] ? parseInt(match[2], 10) : 10;
+            const multiplier = parseInt(match[3], 10);
+
+            if (Number.isFinite(multiplier) && multiplier > 0) {
+                results.push({
+                    productType: productType,
+                    flavor: flavor,
+                    multiplier: multiplier,
+                    spec: `${unitCount}入袋裝`
+                });
+            }
+        }
+
+        return results;
+    }
+
+    const parts = (spec || '').split('/');
+
     parts.forEach(part => {
         const partNoSpace = part.replace(/\s+/g, '');
 
         // 提取口味關鍵字 (擴充支援更多口味)
-        const flavorMatch = partNoSpace.match(/(蔓越莓|焦糖|巧克力|抹茶|椒麻|綜合|蜂蜜|原味|紅茶|海苔|黑糖|青花椒|金沙|肉鬆|檸檬|柑橘|蜂蜜蔓越莓|咖哩)/);
+        const flavorMatch = partNoSpace.match(/(蜂蜜蔓越莓|蔓越莓|焦糖|巧克力|抹茶|椒麻|綜合|蜂蜜|原味|紅茶|海苔|黑糖|青花椒|金沙|肉鬆|檸檬|柑橘|咖哩)/);
 
         // 提取倍數
         const multiplierMatch = partNoSpace.match(/x(\d+)[袋包]/);
@@ -80,6 +107,30 @@ export function splitSpecialProducts(products) {
 
     products.forEach(product => {
         const fullText = ((product.name || '') + (product.spec || '')).replace(/\s+/g, '');
+
+        // === 新增: MOMO 多口味組合拆分（支援無 / 分隔，僅套用 source=MOMO） ===
+        if (product.source === 'MOMO') {
+            const specNoSpace = (product.spec || '').replace(/\s+/g, '');
+            const multiplierTokens = specNoSpace.match(/x\d+[袋包]/g);
+            if (multiplierTokens && multiplierTokens.length >= 2) {
+                const flavorCombos = parseMultiFlavorCombo(fullText, product.spec || '', product.name);
+                const distinctFlavors = new Set(flavorCombos.map(c => c.flavor));
+                if (flavorCombos.length >= 2 && distinctFlavors.size >= 2) {
+                    flavorCombos.forEach(combo => {
+                        result.push({
+                            ...product,
+                            name: `${combo.productType}-${combo.flavor}（組合拆分）`,
+                            spec: combo.spec,
+                            quantity: product.quantity * combo.multiplier,
+                            originalName: product.name,
+                            originalSpec: product.spec,
+                            isSplit: true
+                        });
+                    });
+                    return;
+                }
+            }
+        }
 
         // === 新增: 通用多口味組合拆分 ===
         if (isMultiFlavorCombo(product.spec)) {

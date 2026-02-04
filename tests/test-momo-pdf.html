@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Test MOMO PDF Detection</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    body{font-family: Arial, sans-serif; padding:20px}
+    .box{border:1px solid #ddd;padding:20px;border-radius:8px}
+    pre{background:#f7f7f7;padding:10px;border-radius:6px}
+  </style>
+</head>
+<body>
+  <h1>測試：MOMO PDF 偵測</h1>
+  <div class="box">
+    <p>上傳 PDF 檔案 (例如：sample-data/momo-全部撿貨單.pdf)</p>
+    <input type="file" id="fileInput" accept=".pdf">
+    <div id="result" style="margin-top:12px"></div>
+  </div>
+
+  <script type="module">
+    import { previewPdfForPlatform } from '../js/modules/parsers/ParserFactory.js';
+
+    const fileInput = document.getElementById('fileInput');
+    const result = document.getElementById('result');
+
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      result.innerHTML = '<p>偵測中...</p>';
+      try {
+        const det = await previewPdfForPlatform(file);
+        result.innerHTML = `<pre>${JSON.stringify(det, null, 2)}</pre>`;
+      } catch (err) {
+        result.innerHTML = `<pre>錯誤: ${err.message}</pre>`;
+      }
+    });
+  </script>
+</body>
+</html>

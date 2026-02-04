@@ -14,7 +14,8 @@ export async function initializeData() {
     if (isLoaded) return products;
 
     try {
-        const response = await fetch('js/data/products.json');
+        const productsUrl = new URL('../../data/products.json', import.meta.url);
+        const response = await fetch(productsUrl);
         if (!response.ok) throw new Error('無法讀取商品資料庫');
         products = await response.json();
         isLoaded = true;

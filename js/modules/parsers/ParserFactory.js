@@ -77,6 +77,43 @@ async function previewExcelForPlatform(file) {
 }
 
 /**
+ * 預讀 PDF 內容以識別平台（快速掃描前幾頁文字）
+ * @param {File} file 檔案物件
+ * @returns {Promise<{platform: string|null}>}
+ */
+async function previewPdfForPlatform(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const arrayBuffer = e.target.result;
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                const pagesToScan = Math.min(3, pdf.numPages);
+                let combined = '';
+                for (let i = 1; i <= pagesToScan; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    combined += textContent.items.map(it => it.str).join(' ');
+                }
+
+                // 偵測 MOMO 標記（例如：MO店、MO店+、艾薇手工坊MO店）
+                if (/MO店|MO 店|MO店\+|艾薇手工坊MO店/i.test(combined)) {
+                    resolve({ platform: 'momo' });
+                    return;
+                }
+
+                resolve({ platform: null });
+            } catch (err) {
+                console.warn('previewPdfForPlatform 錯誤', err);
+                resolve({ platform: null });
+            }
+        };
+        reader.onerror = () => resolve({ platform: null });
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+/**
  * 根據檔案類型或名稱自動解析
  * @param {File} file 檔案物件
  * @returns {Promise<Array>} 解析後的商品
@@ -92,6 +129,19 @@ export async function parseFile(file) {
     } else if (fileName.includes('官網') && fileName.endsWith('.xlsx')) {
         return { platform: 'official', data: await parseOfficialExcel(file) };
     } else if (fileName.endsWith('.pdf')) {
+        // 嘗試檢查 PDF 內容是否為 MOMO（例如商店欄位含 MO店）
+        try {
+            const detection = await previewPdfForPlatform(file);
+            if (detection.platform === 'momo') {
+                // 解析 PDF 結構與蝦皮類似，直接呼叫 parseShopeePDF 做文字與座標抽取
+                // 但將來源標記為 MOMO，讓 MappingEngine 使用 MOMO 規則
+                const parsed = await parseShopeePDF(file);
+                const normalized = parsed.map(p => ({ ...p, source: 'MOMO' }));
+                return { platform: 'momo', data: normalized };
+            }
+        } catch (e) {
+            console.warn('PDF 預讀偵測失敗，預設為蝦皮', e);
+        }
         return { platform: 'shopee', data: await parseShopeePDF(file) };
     } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
         // 無法從檔名識別 - 嘗試從內容識別
@@ -119,4 +169,4 @@ export async function parseFile(file) {
 }
 
 // 匯出內容偵測函數供 app.js 使用
-export { previewExcelForPlatform };
+export { previewExcelForPlatform, previewPdfForPlatform };

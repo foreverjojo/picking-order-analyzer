@@ -1,0 +1,77 @@
+<!-- @purpose 測試 MOMO 多口味規格（無 / 分隔）拆分邏輯是否正確 -->
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>測試：MOMO 多口味拆分</title>
+    <style>
+        body { font-family: system-ui, -apple-system, "Segoe UI", Arial, "Noto Sans TC", sans-serif; padding: 16px; }
+        textarea { width: 100%; height: 120px; }
+        pre { background: #f6f8fa; padding: 12px; overflow: auto; }
+        .row { display: grid; grid-template-columns: 1fr; gap: 10px; max-width: 1000px; }
+        button { padding: 8px 12px; }
+    </style>
+</head>
+
+<body>
+    <h1>測試：MOMO 多口味規格拆分</h1>
+    <p>只會在 <code>source = "MOMO"</code> 時觸發拆分。</p>
+
+    <div class="row">
+        <label>
+            規格（每行一筆）：
+            <textarea id="specInput">綜合口味 10入x2袋 蜂蜜蔓越莓 口味10入 x1袋
+綜合口味 10入x2袋 抹茶口味 10入x1袋</textarea>
+        </label>
+
+        <label>
+            source：
+            <select id="sourceSelect">
+                <option value="MOMO" selected>MOMO</option>
+                <option value="蝦皮">蝦皮（不應拆分）</option>
+            </select>
+        </label>
+
+        <button id="runBtn">執行拆分</button>
+
+        <h2>輸出</h2>
+        <pre id="output"></pre>
+    </div>
+
+    <script type="module">
+        import { splitSpecialProducts } from '../js/modules/core/LogicEngine.js';
+
+        function buildInputProducts(specLines, source) {
+            const baseName = '【艾薇手工坊】夏威夷豆塔';
+            return specLines
+                .map(line => line.trim())
+                .filter(Boolean)
+                .map((spec, index) => ({
+                    id: `p${index + 1}`,
+                    name: baseName,
+                    spec,
+                    source,
+                    quantity: 1
+                }));
+        }
+
+        function run() {
+            const specLines = document.getElementById('specInput').value.split(/\r?\n/);
+            const source = document.getElementById('sourceSelect').value;
+            const inputs = buildInputProducts(specLines, source);
+            const outputs = splitSpecialProducts(inputs);
+
+            document.getElementById('output').textContent = JSON.stringify({
+                inputs,
+                outputs
+            }, null, 2);
+        }
+
+        document.getElementById('runBtn').addEventListener('click', run);
+        run();
+    </script>
+</body>
+
+</html>

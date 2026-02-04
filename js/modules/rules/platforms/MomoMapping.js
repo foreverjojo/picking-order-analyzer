@@ -38,23 +38,77 @@ export function autoMapProductMomo(pickingName, pickingSpec, quantity) {
     // 1. 檢查累加格式: x2袋/x1袋 或 x2包/x1包
     const multiPackMatches = fullText.match(/x(\d+)[包袋]/g);
     if (multiPackMatches && multiPackMatches.length > 0) {
-        // 累加所有匹配到的數量
-        multiplier = multiPackMatches.reduce((sum, match) => {
-            const num = parseInt(match.match(/x(\d+)/)[1]);
-            return sum + num;
-        }, 0);
+        const nums = multiPackMatches
+            .map(m => {
+                const mm = m.match(/x(\d+)/);
+                return mm ? parseInt(mm[1], 10) : NaN;
+            })
+            .filter(n => Number.isFinite(n) && n > 0);
+
+        if (nums.length === 1) {
+            multiplier = nums[0];
+        } else if (nums.length >= 2) {
+            const hasOptionList = /單包/.test(fullTextNoSpace) && /[&＆]/.test(fullTextNoSpace);
+            // 嘗試判斷是否為多口味組合：若只出現一種口味，通常代表 PDF 文字重複，避免把同一段 xN 袋算兩次
+            const flavorRegex = /(蜂蜜蔓越莓|蔓越莓|焦糖|巧克力|抹茶|椒麻|綜合|蜂蜜|原味|紅茶|海苔|黑糖|青花椒|金沙|肉鬆|檸檬|柑橘|咖哩)/g;
+            const flavorSet = new Set();
+            for (const fm of fullTextNoSpace.matchAll(flavorRegex)) {
+                let f = fm[1];
+                if (f === '蜂蜜蔓越莓') f = '蔓越莓';
+                flavorSet.add(f);
+            }
+
+            if (flavorSet.size >= 2) {
+                multiplier = nums.reduce((sum, n) => sum + n, 0);
+            } else {
+                // 單一口味：
+                // - 若是選項描述（單包&3包組），取最大值避免多算
+                // - 否則若 x 值不一致（x2 + x1），通常代表實際加購，改採加總避免少算
+                if (hasOptionList) {
+                    multiplier = Math.max(...nums);
+                } else {
+                    const uniqueNums = new Set(nums);
+                    multiplier = uniqueNums.size >= 2 ? nums.reduce((sum, n) => sum + n, 0) : Math.max(...nums);
+                }
+            }
+        }
     }
     // 2. 檢查組合格式: 2包組、2袋組
     else {
-        const groupMatch = fullText.match(/(\d+)[包袋]組/);
-        if (groupMatch) {
-            multiplier = parseInt(groupMatch[1]);
+        // 優先：口味段落的 xN（例如：蔓越莓x2），避免被「單包&3包組」這種選項文字誤判
+        const flavorTimesRegex = /(蜂蜜蔓越莓|蔓越莓|焦糖|巧克力|抹茶|椒麻|綜合|蜂蜜|原味|紅茶|海苔|黑糖|青花椒|金沙|肉鬆|檸檬|柑橘|咖哩)(?:口味)?(?:(\d+)入)?x(\d+)(?![包袋盒入克gG])/g;
+        const flavorTimesNums = [];
+        for (const m of fullTextNoSpace.matchAll(flavorTimesRegex)) {
+            const n = parseInt(m[3], 10);
+            if (Number.isFinite(n) && n > 0) flavorTimesNums.push(n);
         }
-        // 3. 檢查盒裝格式: 2盒
-        else {
-            const boxMatch = specNoSpace.match(/^(\d+)盒/);
-            if (boxMatch) {
-                multiplier = parseInt(boxMatch[1]);
+
+        if (flavorTimesNums.length > 0) {
+            // 口味段落的 xN：
+            // - 選項描述（單包&3包組）取最大值
+            // - 若出現不同 x 值（x2 + x1）且非選項描述，採加總避免少算
+            const hasOptionList = /單包/.test(fullTextNoSpace) && /[&＆]/.test(fullTextNoSpace);
+            const uniqueNums = new Set(flavorTimesNums);
+            if (hasOptionList) {
+                multiplier = Math.max(...flavorTimesNums);
+            } else {
+                multiplier = uniqueNums.size >= 2
+                    ? flavorTimesNums.reduce((sum, n) => sum + n, 0)
+                    : Math.max(...flavorTimesNums);
+            }
+        } else {
+            // 避免把「單包&3包組」這類選項文字誤判為倍數
+            const hasOptionList = /單包/.test(fullTextNoSpace) && /[&＆]/.test(fullTextNoSpace);
+            const groupMatch = hasOptionList ? null : fullText.match(/(\d+)[包袋]組/);
+
+            if (groupMatch) {
+                multiplier = parseInt(groupMatch[1]);
+            } else {
+                // 3. 檢查盒裝格式: 2盒
+                const boxMatch = specNoSpace.match(/^(\d+)盒/);
+                if (boxMatch) {
+                    multiplier = parseInt(boxMatch[1], 10);
+                }
             }
         }
     }
