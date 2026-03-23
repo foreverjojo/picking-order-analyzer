@@ -242,7 +242,7 @@ export function autoMapProductMomo(pickingName, pickingSpec, quantity) {
     // === 千層小酥條 ===
     if (!productName && /千層.*小酥條|小酥條/.test(fullTextNoSpace)) {
         productName = '千層-小酥條';
-        column = 'B'; spec = '小包裝'; confidence = 0.95;
+        confidence = 0.95;
     }
 
     // === 無調味堅果 ===
@@ -299,8 +299,10 @@ export function autoMapProductMomo(pickingName, pickingSpec, quantity) {
     // === 規格提取 (優先順序：specNoSpace > nameNoSpace) ===
     if (!column) {
         // 先檢查來源規格是否包含有效的規格資訊 (克重或入數)
-        const hasValidSpec = /\d+g|\d+入/.test(specNoSpace);
-        const specSource = hasValidSpec ? specNoSpace : nameNoSpace;
+        const normalizedSpecNoSpace = specNoSpace.replace(/ｇ/g, 'g');
+        const normalizedNameNoSpace = nameNoSpace.replace(/ｇ/g, 'g');
+        const hasValidSpec = /\d+g|\d+入/.test(normalizedSpecNoSpace);
+        const specSource = hasValidSpec ? normalizedSpecNoSpace : normalizedNameNoSpace;
 
         // 克重規格 (從大到小排序)
         if (/300g/.test(specSource)) { column = 'B'; spec = '300g'; confidence = 0.9; }
@@ -318,6 +320,7 @@ export function autoMapProductMomo(pickingName, pickingSpec, quantity) {
         else if (/12入/.test(specSource)) { column = 'C'; spec = '12入袋裝'; confidence = 0.9; }
         else if (/10入/.test(specSource)) { column = 'B'; spec = '10入袋裝'; confidence = 0.9; }
         else if (/8入/.test(specSource)) { column = 'B'; spec = '8入袋裝'; confidence = 0.9; }
+        else if (productName === '千層-小酥條') { column = 'B'; spec = '小包裝'; confidence = 0.95; }
         else if (/單顆/.test(fullTextNoSpace) || /活動專用/.test(fullTextNoSpace) || /活動/.test(fullTextNoSpace)) {
             const isMadeleine = /瑪德蓮/.test(fullTextNoSpace);
             column = isMadeleine ? 'C' : 'D'; spec = '單顆'; confidence = 0.9;
