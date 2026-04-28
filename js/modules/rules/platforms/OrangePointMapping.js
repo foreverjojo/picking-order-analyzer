@@ -114,6 +114,12 @@ export function autoMapProductOrangePoint(productName, quantity) {
         column = 'B'; spec = '小包裝'; confidence = 0.95;
     }
 
+    // 千層捲捲酥
+    if (!mappedName && /千層.*捲捲酥|捲捲酥/.test(nameNoSpace)) {
+        mappedName = '千層-捲捲酥';
+        column = 'B'; spec = '60g'; confidence = 0.95;
+    }
+
     const standardizedName = mappedName ? normalizeProductName(mappedName) : null;
     const mappedQuantity = column ? quantity : 0;
 

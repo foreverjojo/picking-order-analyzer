@@ -154,8 +154,23 @@ export function autoMapProductShopee(pickingName, pickingSpec, quantity) {
         else if (/伯爵紅茶/.test(fullTextNoSpace)) extractedFlavor = '奶油-伯爵紅茶';
     }
 
+    // === 千層捲捲酥 ===
+    if (!extractedFlavor && /千層.*捲捲酥|捲捲酥/.test(fullTextNoSpace)) {
+        if (/活動專用/.test(fullTextNoSpace) || /30g/.test(fullTextNoSpace)) {
+            extractedFlavor = '千層-捲捲酥30g';
+        } else {
+            extractedFlavor = '千層-捲捲酥';
+        }
+    }
+
     // === 千層小酥條 ===
-    if (!extractedFlavor && /千層.*小酥條|小酥條/.test(fullTextNoSpace)) extractedFlavor = '千層-小酥條';
+    if (!extractedFlavor && /千層.*小酥條|小酥條/.test(fullTextNoSpace)) {
+        if (/活動專用/.test(fullTextNoSpace) || /30g/.test(fullTextNoSpace)) {
+            extractedFlavor = '千層-小酥條30g';
+        } else {
+            extractedFlavor = '千層-小酥條';
+        }
+    }
 
     // === 雪花餅 ===
     if (!extractedFlavor && /雪花餅/.test(fullTextNoSpace)) {
@@ -216,6 +231,9 @@ export function autoMapProductShopee(pickingName, pickingSpec, quantity) {
     // 特殊商品規格
     else if (productName === '瓦片-原味45克') { column = 'B'; spec = null; confidence = 0.95; multiplier = 1; }
     else if (productName === '千層-小酥條') { column = 'B'; spec = '小包裝'; confidence = 0.95; multiplier = 1; }
+    else if (productName === '千層-小酥條30g') { column = 'B'; spec = '30g'; confidence = 0.95; multiplier = 1; }
+    else if (productName === '千層-捲捲酥') { column = 'B'; spec = '60g'; confidence = 0.95; multiplier = 1; }
+    else if (productName === '千層-捲捲酥30g') { column = 'B'; spec = '30g'; confidence = 0.95; multiplier = 1; }
     else if (/單顆/.test(fullText) || /單個/.test(fullText) || /活動/.test(fullText)) {
         const isMadeleine = /瑪德蓮/.test(fullTextNoSpaceTemp);
         column = isMadeleine ? 'C' : 'D'; spec = '單顆'; confidence = 0.85;

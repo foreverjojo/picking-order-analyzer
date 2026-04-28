@@ -239,10 +239,26 @@ export function autoMapProductMomo(pickingName, pickingSpec, quantity) {
         confidence = 0.9;
     }
 
+// === 千層捲捲酥 ===
+    if (!productName && /千層.*捲捲酥|捲捲酥/.test(fullTextNoSpace)) {
+        if (/活動專用/.test(fullTextNoSpace) || /30g/.test(fullTextNoSpace)) {
+            productName = '千層-捲捲酥30g';
+            column = 'B'; spec = '30g'; confidence = 0.95;
+        } else {
+            productName = '千層-捲捲酥';
+            column = 'B'; spec = '60g'; confidence = 0.95;
+        }
+    }
+
     // === 千層小酥條 ===
     if (!productName && /千層.*小酥條|小酥條/.test(fullTextNoSpace)) {
-        productName = '千層-小酥條';
-        confidence = 0.95;
+        if (/活動專用/.test(fullTextNoSpace) || /30g/.test(fullTextNoSpace)) {
+            productName = '千層-小酥條30g';
+            column = 'B'; spec = '30g'; confidence = 0.95;
+        } else {
+            productName = '千層-小酥條';
+            column = 'B'; spec = '小包裝'; confidence = 0.95;
+        }
     }
 
     // === 無調味堅果 ===
@@ -321,6 +337,9 @@ export function autoMapProductMomo(pickingName, pickingSpec, quantity) {
         else if (/10入/.test(specSource)) { column = 'B'; spec = '10入袋裝'; confidence = 0.9; }
         else if (/8入/.test(specSource)) { column = 'B'; spec = '8入袋裝'; confidence = 0.9; }
         else if (productName === '千層-小酥條') { column = 'B'; spec = '小包裝'; confidence = 0.95; }
+        else if (productName === '千層-小酥條30g') { column = 'B'; spec = '30g'; confidence = 0.95; }
+        else if (productName === '千層-捲捲酥') { column = 'B'; spec = '60g'; confidence = 0.95; }
+        else if (productName === '千層-捲捲酥30g') { column = 'B'; spec = '30g'; confidence = 0.95; }
         else if (/單顆/.test(fullTextNoSpace) || /活動專用/.test(fullTextNoSpace) || /活動/.test(fullTextNoSpace)) {
             const isMadeleine = /瑪德蓮/.test(fullTextNoSpace);
             column = isMadeleine ? 'C' : 'D'; spec = '單顆'; confidence = 0.9;
