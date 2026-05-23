@@ -230,7 +230,7 @@ export function autoMapProductShopee(pickingName, pickingSpec, quantity) {
     else if (/8入/.test(specSource)) { column = 'B'; spec = '8入袋裝'; confidence = 0.9; }
     // 特殊商品規格
     else if (productName === '瓦片-原味45克') { column = 'B'; spec = null; confidence = 0.95; multiplier = 1; }
-    else if (productName === '千層-小酥條') { column = 'B'; spec = '小包裝'; confidence = 0.95; multiplier = 1; }
+    else if (productName === '千層-小酥條') { column = 'B'; spec = '60g'; confidence = 0.95; multiplier = 1; }
     else if (productName === '千層-小酥條30g') { column = 'B'; spec = '30g'; confidence = 0.95; multiplier = 1; }
     else if (productName === '千層-捲捲酥') { column = 'B'; spec = '60g'; confidence = 0.95; multiplier = 1; }
     else if (productName === '千層-捲捲酥30g') { column = 'B'; spec = '30g'; confidence = 0.95; multiplier = 1; }

@@ -305,7 +305,7 @@ function autoMapProductMomo(pickingName, pickingSpec, quantity) {
             column = 'B'; spec = '30g'; confidence = 0.95;
         } else {
             productName = '千層-小酥條';
-            column = 'B'; spec = '小包裝'; confidence = 0.95;
+            column = 'B'; spec = '60g'; confidence = 0.95;
         }
     }
 
@@ -706,9 +706,9 @@ function autoMapProductShopee(pickingName, pickingSpec, quantity) {
     else if (productName === '瓦片-原味45克') {
         column = 'B'; spec = null; confidence = 0.95; multiplier = 1;
     }
-    // 千層小酥條 - 直接映射到 B 欄/小包裝
+    // 千層小酥條 - 直接映射到 B 欄/60g
     else if (productName === '千層-小酥條') {
-        column = 'B'; spec = '小包裝'; confidence = 0.95; multiplier = 1;
+        column = 'B'; spec = '60g'; confidence = 0.95; multiplier = 1;
     }
     // 千層小酥條30g - 活動專用
     else if (productName === '千層-小酥條30g') {
@@ -858,7 +858,7 @@ function autoMapProductOrangePoint(productName, quantity) {
     // 千層小酥條
     if (!mappedName && /千層.*小酥條|小酥條/.test(nameNoSpace)) {
         mappedName = '千層-小酥條';
-        column = 'B'; spec = '小包裝'; confidence = 0.95;
+        column = 'B'; spec = '60g'; confidence = 0.95;
     }
 
     // 千層捲捲酥

@@ -111,7 +111,7 @@ export function autoMapProductOrangePoint(productName, quantity) {
     // 千層小酥條
     if (!mappedName && /千層.*小酥條|小酥條/.test(nameNoSpace)) {
         mappedName = '千層-小酥條';
-        column = 'B'; spec = '小包裝'; confidence = 0.95;
+        column = 'B'; spec = '60g'; confidence = 0.95;
     }
 
     // 千層捲捲酥

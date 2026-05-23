@@ -257,7 +257,7 @@ export function autoMapProductMomo(pickingName, pickingSpec, quantity) {
             column = 'B'; spec = '30g'; confidence = 0.95;
         } else {
             productName = '千層-小酥條';
-            column = 'B'; spec = '小包裝'; confidence = 0.95;
+            column = 'B'; spec = '60g'; confidence = 0.95;
         }
     }
 
@@ -336,7 +336,7 @@ export function autoMapProductMomo(pickingName, pickingSpec, quantity) {
         else if (/12入/.test(specSource)) { column = 'C'; spec = '12入袋裝'; confidence = 0.9; }
         else if (/10入/.test(specSource)) { column = 'B'; spec = '10入袋裝'; confidence = 0.9; }
         else if (/8入/.test(specSource)) { column = 'B'; spec = '8入袋裝'; confidence = 0.9; }
-        else if (productName === '千層-小酥條') { column = 'B'; spec = '小包裝'; confidence = 0.95; }
+        else if (productName === '千層-小酥條') { column = 'B'; spec = '60g'; confidence = 0.95; }
         else if (productName === '千層-小酥條30g') { column = 'B'; spec = '30g'; confidence = 0.95; }
         else if (productName === '千層-捲捲酥') { column = 'B'; spec = '60g'; confidence = 0.95; }
         else if (productName === '千層-捲捲酥30g') { column = 'B'; spec = '30g'; confidence = 0.95; }
