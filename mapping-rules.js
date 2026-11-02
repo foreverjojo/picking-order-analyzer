@@ -33,8 +33,8 @@ const standardProductNames = [
     '西點-綜合', '西點-巧克力貝殼', '西點-咖啡小花', '西點-藍莓小花', '西點-蔓越莓貝殼', '西點-乳酪酥條',
     // 千層
     '千層-捲捲酥',
-    '千層-小酥條',
-    '千層-小酥條30g',
+    '千層-一口酥',
+    '千層-一口酥30g',
     '千層-捲捲酥30g',
     // 禮盒
     '雙塔禮盒', '蔓越莓禮盒', '綜豆禮盒', '綜堅禮盒', '晴空塔餅禮盒', '暖暖幸福禮盒', '臻愛時光禮盒', '濃情滿載禮盒',
@@ -298,13 +298,13 @@ function autoMapProductMomo(pickingName, pickingSpec, quantity) {
         }
     }
 
-    // === 千層小酥條 ===
-    if (!productName && /千層.*小酥條|小酥條/.test(fullTextNoSpace)) {
+    // === 千層一口酥 (舊名：千層小酥條，保留舊名辨識) ===
+    if (!productName && /千層.*一口酥|一口酥|千層.*小酥條|小酥條/.test(fullTextNoSpace)) {
         if (/活動專用/.test(fullTextNoSpace) || /30g/.test(fullTextNoSpace)) {
-            productName = '千層-小酥條30g';
+            productName = '千層-一口酥30g';
             column = 'B'; spec = '30g'; confidence = 0.95;
         } else {
-            productName = '千層-小酥條';
+            productName = '千層-一口酥';
             column = 'B'; spec = '60g'; confidence = 0.95;
         }
     }
@@ -593,12 +593,12 @@ function autoMapProductShopee(pickingName, pickingSpec, quantity) {
         }
     }
 
-    // === 千層小酥條 ===
-    if (!extractedFlavor && /千層.*小酥條|小酥條/.test(fullTextNoSpace)) {
+    // === 千層一口酥 (舊名：千層小酥條，保留舊名辨識) ===
+    if (!extractedFlavor && /千層.*一口酥|一口酥|千層.*小酥條|小酥條/.test(fullTextNoSpace)) {
         if (/活動專用/.test(fullTextNoSpace) || /30g/.test(fullTextNoSpace)) {
-            extractedFlavor = '千層-小酥條30g';
+            extractedFlavor = '千層-一口酥30g';
         } else {
-            extractedFlavor = '千層-小酥條';
+            extractedFlavor = '千層-一口酥';
         }
     }
 
@@ -706,12 +706,12 @@ function autoMapProductShopee(pickingName, pickingSpec, quantity) {
     else if (productName === '瓦片-原味45克') {
         column = 'B'; spec = null; confidence = 0.95; multiplier = 1;
     }
-    // 千層小酥條 - 直接映射到 B 欄/60g
-    else if (productName === '千層-小酥條') {
+    // 千層一口酥 - 直接映射到 B 欄/60g
+    else if (productName === '千層-一口酥') {
         column = 'B'; spec = '60g'; confidence = 0.95; multiplier = 1;
     }
-    // 千層小酥條30g - 活動專用
-    else if (productName === '千層-小酥條30g') {
+    // 千層一口酥30g - 活動專用
+    else if (productName === '千層-一口酥30g') {
         column = 'B'; spec = '30g'; confidence = 0.95; multiplier = 1;
     }
     // 千層捲捲酥
@@ -855,9 +855,9 @@ function autoMapProductOrangePoint(productName, quantity) {
         else if (/10入/.test(nameNoSpace)) { column = 'B'; spec = '10入袋裝'; }
     }
 
-    // 千層小酥條
-    if (!mappedName && /千層.*小酥條|小酥條/.test(nameNoSpace)) {
-        mappedName = '千層-小酥條';
+    // 千層一口酥 (舊名：千層小酥條，保留舊名辨識)
+    if (!mappedName && /千層.*一口酥|一口酥|千層.*小酥條|小酥條/.test(nameNoSpace)) {
+        mappedName = '千層-一口酥';
         column = 'B'; spec = '60g'; confidence = 0.95;
     }
 

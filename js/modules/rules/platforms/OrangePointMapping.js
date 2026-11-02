@@ -108,9 +108,9 @@ export function autoMapProductOrangePoint(productName, quantity) {
         else if (/月光序曲/.test(nameNoSpace)) mappedName = '輕-月光序曲禮盒';
     }
 
-    // 千層小酥條
-    if (!mappedName && /千層.*小酥條|小酥條/.test(nameNoSpace)) {
-        mappedName = '千層-小酥條';
+    // 千層一口酥 (舊名：千層小酥條，保留舊名辨識)
+    if (!mappedName && /千層.*一口酥|一口酥|千層.*小酥條|小酥條/.test(nameNoSpace)) {
+        mappedName = '千層-一口酥';
         column = 'B'; spec = '60g'; confidence = 0.95;
     }
 
