@@ -126,6 +126,10 @@ function autoMapProductMomo(pickingName, pickingSpec, quantity) {
     if (/咖啡/.test(fullTextNoSpace) && !/咖啡小花/.test(fullTextNoSpace) && !isGiftBox) {
         return { templateProduct: null, templateColumn: null, templateSpec: null, multiplier: 1, mappedQuantity: 0, confidence: 0 };
     }
+    // 花茶茶包 (官網滿額贈品選項) 不需映射，比照咖啡排除；禮盒例外
+    if (/花茶|茶包/.test(fullTextNoSpace) && !isGiftBox) {
+        return { templateProduct: null, templateColumn: null, templateSpec: null, multiplier: 1, mappedQuantity: 0, confidence: 0 };
+    }
     if (/提袋加購/.test(fullTextNoSpace) || /運費/.test(fullTextNoSpace)) {
         return { templateProduct: null, templateColumn: null, templateSpec: null, multiplier: 1, mappedQuantity: 0, confidence: 0 };
     }
@@ -237,6 +241,8 @@ function autoMapProductMomo(pickingName, pickingSpec, quantity) {
         else if (/抹茶/.test(fullTextNoSpace)) productName = '雪花餅-抹茶';
         else if (/肉鬆/.test(fullTextNoSpace)) productName = '雪花餅-肉鬆';
         else if (/綜合/.test(fullTextNoSpace)) productName = '雪花餅-綜合';
+        // 官網滿額贈品「雪花餅(2入)口味隨機」→ 雪花餅-蔓越莓
+        else if (/滿額贈品/.test(fullTextNoSpace) && /隨機/.test(fullTextNoSpace)) productName = '雪花餅-蔓越莓';
         confidence = 0.9;
     }
 
@@ -382,7 +388,8 @@ function autoMapProductMomo(pickingName, pickingSpec, quantity) {
         else if (/12入/.test(fullTextNoSpace)) { column = 'C'; spec = '12入袋裝'; confidence = 0.85; }
         else if (/8入/.test(fullTextNoSpace)) { column = 'B'; spec = '8入袋裝'; confidence = 0.85; }
         // 單顆/活動專用 - 瑪德蓮用 C 欄，其他用 D 欄
-        else if (/單顆/.test(fullTextNoSpace) || /活動專用/.test(fullTextNoSpace) || /活動/.test(fullTextNoSpace)) {
+        // 單顆 / 活動 / 官網滿額贈品 (例：夏威夷豆塔 2入) → 單顆欄位，N入 作為倍數
+        else if (/單顆/.test(fullTextNoSpace) || /活動專用/.test(fullTextNoSpace) || /活動/.test(fullTextNoSpace) || /滿額贈品/.test(fullTextNoSpace)) {
             const isMadeleine = /瑪德蓮/.test(fullTextNoSpace);
             column = isMadeleine ? 'C' : 'D'; spec = '單顆'; confidence = 0.9;
             const activityMatch = specNoSpace.match(/(\d+)入/);
